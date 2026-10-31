@@ -4,6 +4,7 @@ const fs = require("node:fs");
 const path = require("node:path");
 const { execFileSync } = require("node:child_process");
 const { createManifest } = require("./manifest");
+const validateReleaseTag = require("./release-version");
 
 const ROOT = path.resolve(__dirname, "..");
 const DIST = path.join(ROOT, "dist");
@@ -15,9 +16,7 @@ const IPK = path.join(BUILD, `${APPINFO.id}.ipk`);
 if (APPINFO.version !== PACKAGE.version) {
   throw new Error(`appinfo.json version ${APPINFO.version} does not match package.json ${PACKAGE.version}`);
 }
-if (process.env.GITHUB_REF_NAME && process.env.GITHUB_REF_NAME !== `v${APPINFO.version}`) {
-  throw new Error(`Release tag ${process.env.GITHUB_REF_NAME} does not match app version v${APPINFO.version}`);
-}
+validateReleaseTag(APPINFO);
 
 function remove(pathname) {
   fs.rmSync(pathname, { recursive: true, force: true });

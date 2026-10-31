@@ -7,8 +7,8 @@
     "node": ">=20"
   },
   "scripts": {
-    "test": "bash tests/bundle-tests.sh && bash tests/lifecycle-tests.sh && node tests/ui-config.test.js && node tests/ui-smoke.test.js && node tests/manifest.test.js",
-    "check:shell": "bash -n scripts/lib/bundle.sh scripts/ca-manager.sh scripts/boot-hook.sh tests/bundle-tests.sh tests/lifecycle-tests.sh tests/provider-source-smoke.sh && node --check src/config.js && node --check src/app.js && node --check tools/build.js && node --check tools/manifest.js",
+    "test": "bash tests/bundle-tests.sh && bash tests/lifecycle-tests.sh && node tests/ui-config.test.js && node tests/ui-smoke.test.js && node tests/manifest.test.js && node tests/release-version.test.js",
+    "check:shell": "bash -n scripts/lib/bundle.sh scripts/ca-manager.sh scripts/boot-hook.sh tests/bundle-tests.sh tests/lifecycle-tests.sh tests/provider-source-smoke.sh && node --check src/config.js && node --check src/app.js && node --check tools/build.js && node --check tools/manifest.js && node --check tools/release-version.js",
     "package": "node tools/build.js",
     "manifest": "node tools/build.js manifest",
     "test:providers": "bash tests/provider-source-smoke.sh"
