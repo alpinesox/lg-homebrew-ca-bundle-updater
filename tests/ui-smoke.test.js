@@ -6,6 +6,7 @@ const vm = require("node:vm");
 const elements = Object.create(null);
 const calls = [];
 const methods = [];
+let foreignMount = "0";
 
 function element(id) {
   if (!elements[id]) {
@@ -44,12 +45,18 @@ const context = {
         calls.push(options.parameters.command);
         methods.push(options.method);
         if (options.method === "spawn") {
-          options.onSuccess({ type: "stdoutData", stdoutString: "Applied fixture bundle." });
-          options.onSuccess({ type: "exit", exitCode: 0 });
+          assert.equal(options.parameters.subscribe, true);
+          options.onSuccess({ event: "stdoutData", stdoutString: "Applied fixture bundle." });
+          options.onSuccess({ event: "exit", exitCode: 0 });
+        } else if (options.parameters.command.indexOf(" bootstrap") !== -1) {
+          options.onSuccess({
+            returnValue: true,
+            stdoutString: "helper_path=/var/lib/webosbrew/ca-bundle-manager/releases/" + "a".repeat(64) + "/ca-manager.sh\n"
+          });
         } else if (options.parameters.command.indexOf(" status") !== -1) {
           options.onSuccess({
             returnValue: true,
-            stdoutString: "active=0\nmounted=0\nboot_checks=0\nmozilla=1\nchrome=0\ncustom_path_b64=\nactive_sha256=\ncertificate_count=0\nstaged=0\n"
+            stdoutString: "active=0\nmounted=0\nforeign_mount=" + foreignMount + "\nboot_checks=0\nmozilla=1\nchrome=0\ncustom_path_b64=\nactive_sha256=\ncertificate_count=0\nstaged=0\nlast_check=not-run\n"
           });
         } else {
           options.onSuccess({ returnValue: true, stdoutString: "ok" });
@@ -87,5 +94,11 @@ element("boot-checks-button").trigger("click");
 assert.ok(calls.some(command => command.endsWith(" boot-checks on")));
 element("restore-button").trigger("click");
 assert.ok(calls.some(command => command.endsWith(" restore")));
+foreignMount = "1";
+element("boot-checks-button").trigger("click");
+assert.equal(element("active-indicator").textContent, "OTHER OVERLAY");
+assert.equal(element("apply-button").disabled, true);
+assert.equal(element("restore-button").disabled, true);
+assert.match(element("action-result").textContent, /Another CA overlay is mounted/);
 
 console.log("UI smoke tests passed");

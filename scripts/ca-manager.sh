@@ -6,26 +6,29 @@ APP_ID=com.alpinesox.cabundlemanager
 if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
     TEST_ROOT=${CA_MANAGER_TEST_ROOT:?}
     APP_ROOT=$TEST_ROOT/app
+    STATE=$TEST_ROOT/state
     TARGET=$TEST_ROOT/etc/ssl/certs/ca-certificates.crt
     HOOK=$TEST_ROOT/var/lib/webosbrew/init.d/55-ca-bundle-manager
 else
     APP_ROOT=/media/developer/apps/usr/palm/applications/$APP_ID
+    STATE=/var/lib/webosbrew/ca-bundle-manager
     TARGET=/etc/ssl/certs/ca-certificates.crt
     HOOK=/var/lib/webosbrew/init.d/55-ca-bundle-manager
 fi
 
-STATE=$APP_ROOT/state
 SOURCES=$STATE/sources
 CONFIG=$STATE/config
 STOCK=$STATE/stock-ca.pem
 ACTIVE=$STATE/active-ca.pem
 ACTIVE_FLAG=$STATE/active.enabled
 STAGED=$STATE/staged-ca.pem
-LIB=$APP_ROOT/scripts/lib/bundle.sh
 LOG=$STATE/last-check.log
 HOOK_HASH=$STATE/boot-hook.sha256
 FETCH_CA=
 
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+LIB=$SCRIPT_DIR/lib/bundle.sh
+HOOK_SOURCE=$SCRIPT_DIR/boot-hook.sh
 . "$LIB" || exit 1
 
 fail() {
@@ -41,6 +44,65 @@ require_root() {
 ensure_state() {
     mkdir -p "$SOURCES" "$(dirname "$TARGET")" || return 1
     chmod 700 "$STATE" 2>/dev/null || true
+    chmod 700 "$SOURCES" 2>/dev/null || true
+}
+
+run_bootstrap() {
+    require_root || return 1
+    [ -r "$APP_ROOT/scripts/ca-manager.sh" ] && [ -r "$APP_ROOT/scripts/lib/bundle.sh" ] && [ -r "$APP_ROOT/scripts/boot-hook.sh" ] || {
+        fail 'The installed app helper files are missing.'
+        return 1
+    }
+    mkdir -p "$STATE/releases" "$SOURCES" || return 1
+    chmod 700 "$STATE" "$STATE/releases" "$SOURCES" || return 1
+    helper_hash=$(sha256sum "$APP_ROOT/scripts/ca-manager.sh" | awk '{print $1}') || return 1
+    library_hash=$(sha256sum "$APP_ROOT/scripts/lib/bundle.sh" | awk '{print $1}') || return 1
+    hook_hash=$(sha256sum "$APP_ROOT/scripts/boot-hook.sh" | awk '{print $1}') || return 1
+    release_id=$(printf '%s\n%s\n%s\n' "$helper_hash" "$library_hash" "$hook_hash" | sha256sum | awk '{print $1}')
+    release_dir=$STATE/releases/$release_id
+    release_valid=0
+    if [ -x "$release_dir/ca-manager.sh" ] && [ -r "$release_dir/lib/bundle.sh" ] && [ -r "$release_dir/boot-hook.sh" ]; then
+        installed_helper_hash=$(sha256sum "$release_dir/ca-manager.sh" | awk '{print $1}')
+        installed_library_hash=$(sha256sum "$release_dir/lib/bundle.sh" | awk '{print $1}')
+        installed_hook_hash=$(sha256sum "$release_dir/boot-hook.sh" | awk '{print $1}')
+        installed_id=$(printf '%s\n%s\n%s\n' "$installed_helper_hash" "$installed_library_hash" "$installed_hook_hash" | sha256sum | awk '{print $1}')
+        [ "$installed_id" = "$release_id" ] && release_valid=1
+    fi
+    if [ "$release_valid" != 1 ]; then
+        bootstrap_temp=$STATE/releases/.tmp.$release_id.$$
+        mkdir -m 700 "$bootstrap_temp" || return 1
+        mkdir -m 700 "$bootstrap_temp/lib" || { rm -rf "$bootstrap_temp"; return 1; }
+        if ! cp "$APP_ROOT/scripts/ca-manager.sh" "$bootstrap_temp/ca-manager.sh" ||
+            ! cp "$APP_ROOT/scripts/lib/bundle.sh" "$bootstrap_temp/lib/bundle.sh" ||
+            ! cp "$APP_ROOT/scripts/boot-hook.sh" "$bootstrap_temp/boot-hook.sh"; then
+            rm -rf "$bootstrap_temp"
+            return 1
+        fi
+        chmod 700 "$bootstrap_temp/ca-manager.sh" "$bootstrap_temp/boot-hook.sh" || { rm -rf "$bootstrap_temp"; return 1; }
+        chmod 600 "$bootstrap_temp/lib/bundle.sh" || { rm -rf "$bootstrap_temp"; return 1; }
+        sh -n "$bootstrap_temp/ca-manager.sh" && sh -n "$bootstrap_temp/lib/bundle.sh" && sh -n "$bootstrap_temp/boot-hook.sh" || { rm -rf "$bootstrap_temp"; return 1; }
+        staged_helper_hash=$(sha256sum "$bootstrap_temp/ca-manager.sh" | awk '{print $1}')
+        staged_library_hash=$(sha256sum "$bootstrap_temp/lib/bundle.sh" | awk '{print $1}')
+        staged_hook_hash=$(sha256sum "$bootstrap_temp/boot-hook.sh" | awk '{print $1}')
+        staged_id=$(printf '%s\n%s\n%s\n' "$staged_helper_hash" "$staged_library_hash" "$staged_hook_hash" | sha256sum | awk '{print $1}')
+        [ "$staged_id" = "$release_id" ] || { rm -rf "$bootstrap_temp"; return 1; }
+        rm -rf "$release_dir"
+        mv "$bootstrap_temp" "$release_dir" || { rm -rf "$bootstrap_temp"; return 1; }
+    fi
+    version_temp=$STATE/current.version.tmp.$$
+    printf '%s\n' "$release_id" > "$version_temp" || return 1
+    chmod 600 "$version_temp" || { rm -f "$version_temp"; return 1; }
+    mv -f "$version_temp" "$STATE/current.version" || { rm -f "$version_temp"; return 1; }
+    rm -f "$STATE/ca-manager.sh" "$STATE/lib/bundle.sh"
+    rmdir "$STATE/lib" 2>/dev/null || true
+    if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
+        mkdir -p "$TEST_ROOT/state/sources"
+    fi
+    if [ ! -x "$STATE/releases/$release_id/ca-manager.sh" ]; then
+        fail 'Protected helper installation did not produce an executable manager.'
+        return 1
+    fi
+    printf 'helper_path=%s\n' "$STATE/releases/$release_id/ca-manager.sh"
 }
 
 set_last_check() {
@@ -150,17 +212,35 @@ parse_selection() {
 
 target_is_mounted() {
     if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
-        [ -f "$STATE/test-mounted" ]
+        [ -f "$STATE/test-mounted" ] || [ -f "$STATE/test-foreign-mounted" ]
         return $?
     fi
     awk -v target="$TARGET" '$2 == target { found = 1 } END { exit !found }' /proc/mounts
+}
+
+target_is_our_mount() {
+    target_is_mounted || return 1
+    if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
+        [ -f "$STATE/test-mounted" ] && [ ! -f "$STATE/test-foreign-mounted" ]
+        return $?
+    fi
+    [ -f "$ACTIVE" ] || return 1
+    target_inode=$(stat -c '%d:%i' "$TARGET" 2>/dev/null) || return 1
+    active_inode=$(stat -c '%d:%i' "$ACTIVE" 2>/dev/null) || return 1
+    [ "$target_inode" = "$active_inode" ]
+}
+
+target_is_foreign_mount() {
+    target_is_mounted || return 1
+    target_is_our_mount && return 1
+    return 0
 }
 
 manager_mount() {
     source_file=$1
     if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
         [ "${CA_MANAGER_TEST_FAIL_MOUNT:-0}" != 1 ] || return 1
-        cp "$source_file" "$TARGET" && : > "$STATE/test-mounted"
+        cp "$source_file" "$TARGET" && rm -f "$STATE/test-foreign-mounted" && : > "$STATE/test-mounted"
     else
         mount --bind "$source_file" "$TARGET"
     fi
@@ -169,7 +249,7 @@ manager_mount() {
 manager_unmount() {
     if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
         [ "${CA_MANAGER_TEST_FAIL_UNMOUNT:-0}" != 1 ] || return 1
-        cp "$STOCK" "$TARGET" && rm -f "$STATE/test-mounted"
+        cp "$STOCK" "$TARGET" && rm -f "$STATE/test-mounted" "$STATE/test-foreign-mounted"
     else
         umount "$TARGET"
     fi
@@ -364,11 +444,12 @@ install_hook() {
     if [ "${CA_MANAGER_TESTING:-0}" = 1 ] && [ "${CA_MANAGER_TEST_FAIL_HOOK:-0}" = 1 ]; then return 1; fi
     if [ -f "$HOOK" ]; then
         hook_is_owned || { fail 'A different or modified startup hook already uses the CA manager hook path.'; return 1; }
-        if cmp -s "$APP_ROOT/scripts/boot-hook.sh" "$HOOK"; then return 0; fi
+        if cmp -s "$HOOK_SOURCE" "$HOOK"; then return 0; fi
     fi
     if [ -e "$HOOK" ] && [ ! -f "$HOOK" ]; then fail 'A non-regular file uses the CA manager hook path.'; return 1; fi
     hook_temp=$HOOK.tmp.$$
-    cp "$APP_ROOT/scripts/boot-hook.sh" "$hook_temp" || return 1
+    [ -r "$HOOK_SOURCE" ] || return 1
+    cp "$HOOK_SOURCE" "$hook_temp" || return 1
     chmod 755 "$hook_temp" || { rm -f "$hook_temp"; return 1; }
     mv -f "$hook_temp" "$HOOK" || { rm -f "$hook_temp"; return 1; }
     hook_hash=$(sha256sum "$HOOK" | awk '{print $1}')
@@ -386,7 +467,7 @@ hook_is_owned() {
         [ $((hook_mode_num & 022)) -eq 0 ] || return 1
     fi
     hook_actual=$(sha256sum "$HOOK" | awk '{print $1}')
-    hook_expected=$(sha256sum "$APP_ROOT/scripts/boot-hook.sh" | awk '{print $1}')
+    hook_expected=$(sha256sum "$HOOK_SOURCE" | awk '{print $1}')
     if [ -r "$HOOK_HASH" ] && [ "$(cat "$HOOK_HASH")" = "$hook_actual" ]; then return 0; fi
     [ "$hook_actual" = "$hook_expected" ]
 }
@@ -414,7 +495,7 @@ run_apply() {
     refresh_sources || { fail 'Could not refresh selected sources; active trust was not changed.'; return 1; }
     apply_candidate=$STATE/apply-candidate.$$
     build_candidate "$apply_candidate" || { fail 'The selected sources did not produce a valid CA bundle.'; return 1; }
-    if target_is_mounted && [ "${CA_MANAGER_TESTING:-0}" != 1 ] && ! findmnt -T "$TARGET" -n -o SOURCE 2>/dev/null | grep -q 'active-ca.pem'; then
+    if target_is_foreign_mount; then
         rm -f "$apply_candidate"
         fail 'The CA path is mounted by another source; refusing to replace it.'
         return 1
@@ -427,32 +508,35 @@ run_apply() {
     if [ -s "$ACTIVE" ]; then
         if ! cp -p "$ACTIVE" "$STATE/previous-ca.pem"; then rm -f "$apply_candidate"; return 1; fi
     fi
-    cp "$apply_candidate" "$STATE/active-ca.tmp.$$" || { rm -f "$apply_candidate"; return 1; }
-    rm -f "$apply_candidate"
-    mv -f "$STATE/active-ca.tmp.$$" "$ACTIVE" || { rm -f "$STATE/active-ca.tmp.$$"; return 1; }
+    had_active_mount=0
     if target_is_mounted; then
         if ! manager_unmount; then
-            if [ "$previous_active" = 1 ] && [ -s "$STATE/previous-ca.pem" ]; then cp -f "$STATE/previous-ca.pem" "$ACTIVE"; fi
+            rm -f "$apply_candidate"
             fail 'Could not replace the existing CA mount; previous trust is still active.'
             return 1
         fi
+        had_active_mount=1
     fi
     if ! install_hook; then
         rollback_ok=1
-        if [ "$previous_active" = 1 ] && [ -s "$STATE/previous-ca.pem" ]; then
+        if [ "$previous_active" = 1 ] && [ -s "$STATE/previous-ca.pem" ] && [ "$had_active_mount" = 1 ]; then
             cp -f "$STATE/previous-ca.pem" "$ACTIVE"
             manager_mount "$ACTIVE" || rollback_ok=0
         fi
-        remove_hook_if_unused
+        rm -f "$apply_candidate"
         if [ "$rollback_ok" = 1 ] && [ "$previous_active" = 1 ]; then
             fail 'Could not update the boot hook; the previous approved bundle was restored.'
         elif [ "$rollback_ok" = 1 ]; then
+            remove_hook_if_unused
             fail 'Could not install the boot hook; stock trust remains active.'
         else
             fail 'Could not install the boot hook or remount the previous bundle; stock trust is visible and the approved bundle will be retried at boot.'
         fi
         return 1
     fi
+    cp "$apply_candidate" "$STATE/active-ca.tmp.$$" || { rm -f "$apply_candidate"; return 1; }
+    rm -f "$apply_candidate"
+    mv -f "$STATE/active-ca.tmp.$$" "$ACTIVE" || { rm -f "$STATE/active-ca.tmp.$$"; return 1; }
     if ! manager_mount "$ACTIVE"; then
         rollback_ok=1
         if [ "$previous_active" = 1 ] && [ -s "$STATE/previous-ca.pem" ]; then
@@ -538,8 +622,9 @@ run_status() {
     ensure_state || return 1
     load_config || return 1
     mounted=0
+    foreign_mount=0
     if target_is_mounted; then
-        if [ "${CA_MANAGER_TESTING:-0}" = 1 ] || findmnt -T "$TARGET" -n -o SOURCE 2>/dev/null | grep -q 'active-ca.pem'; then mounted=1; fi
+        if target_is_our_mount; then mounted=1; else foreign_mount=1; fi
     fi
     current_hash=
     cert_count=0
@@ -552,33 +637,41 @@ run_status() {
     last_check=not-run
     [ -r "$STATE/last-check" ] && last_check=$(cat "$STATE/last-check")
     case "$last_check" in staged|staged-stale|unchanged|stale|source-error|invalid|disabled|not-run) ;; *) last_check=invalid ;; esac
-    printf 'active=%s\nmounted=%s\nboot_checks=%s\nmozilla=%s\nchrome=%s\ncustom_path_b64=%s\nactive_sha256=%s\ncertificate_count=%s\nstaged=%s\n' \
-        "$active" "$mounted" "$boot_checks" "$mozilla" "$chrome" "$custom_path_b64" "$current_hash" "$cert_count" "$staged"
+    printf 'active=%s\nmounted=%s\nforeign_mount=%s\nboot_checks=%s\nmozilla=%s\nchrome=%s\ncustom_path_b64=%s\nactive_sha256=%s\ncertificate_count=%s\nstaged=%s\n' \
+        "$active" "$mounted" "$foreign_mount" "$boot_checks" "$mozilla" "$chrome" "$custom_path_b64" "$current_hash" "$cert_count" "$staged"
     printf 'last_check=%s\n' "$last_check"
 }
 
 run_restore() {
     ensure_state || return 1
-    load_config || return 1
-    if target_is_mounted; then
-        if [ "${CA_MANAGER_TESTING:-0}" != 1 ] && ! findmnt -T "$TARGET" -n -o SOURCE 2>/dev/null | grep -q 'active-ca.pem'; then
-            fail 'The CA path is mounted by another source; refusing to unmount it.'
-            return 1
-        fi
+    if target_is_foreign_mount; then fail 'The CA path is mounted by another source; refusing to unmount it.'; return 1; fi
+    config_backup=$STATE/config.restore-backup.$$
+    config_was_present=0
+    if [ -f "$CONFIG" ]; then
+        cp -p "$CONFIG" "$config_backup" || { fail 'Could not preserve settings; trust was not changed.'; return 1; }
+        config_was_present=1
     fi
-    previous_boot_checks=$boot_checks
+    mozilla=1
+    chrome=0
     boot_checks=0
+    custom_path_b64=
+    active=0
     if ! save_config; then
-        boot_checks=$previous_boot_checks
+        rm -f "$config_backup"
         fail 'Could not disable boot behavior; active trust was not changed.'
         return 1
     fi
     if ! set_active 0; then
-        boot_checks=$previous_boot_checks
-        save_config || true
+        if [ "$config_was_present" = 1 ]; then
+            mv -f "$config_backup" "$CONFIG" || cp -p "$config_backup" "$CONFIG" || true
+        else
+            rm -f "$CONFIG"
+        fi
+        rm -f "$config_backup"
         fail 'Could not disable boot application; current trust was not changed.'
         return 1
     fi
+    rm -f "$config_backup"
     set_last_check disabled || true
     hook_removed=1
     remove_hook || hook_removed=0
@@ -622,11 +715,16 @@ run_startup() {
         remove_hook
         return $?
     fi
+    install_hook || { echo 'Could not validate or refresh the CA manager startup hook.' >&2; return 1; }
     if [ "$active" = 1 ] && [ -s "$ACTIVE" ] && ca_bundle_validate "$ACTIVE"; then
         if ! target_is_mounted; then manager_mount "$ACTIVE" || echo 'Could not mount approved CA bundle; stock trust remains active.' >&2; fi
     fi
     if [ "$boot_checks" = 1 ]; then
-        nohup "$APP_ROOT/scripts/ca-manager.sh" check > "$LOG" 2>&1 </dev/null &
+        if [ "${CA_MANAGER_TESTING:-0}" = 1 ]; then
+            "$SCRIPT_DIR/ca-manager.sh" check >> "$LOG" 2>&1 || true
+        else
+            nohup "$SCRIPT_DIR/ca-manager.sh" check > "$LOG" 2>&1 </dev/null &
+        fi
     fi
 }
 
@@ -656,6 +754,7 @@ main() {
     shift || true
     case "$action" in
         status) run_status ;;
+        bootstrap) run_bootstrap ;;
         configure) run_configure "$@" ;;
         apply) if [ "$#" -ne 0 ]; then fail 'Invalid apply arguments.'; else run_apply; fi ;;
         restore) if [ "$#" -ne 0 ]; then fail 'Invalid restore arguments.'; else run_restore; fi ;;

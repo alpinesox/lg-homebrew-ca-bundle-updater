@@ -109,7 +109,7 @@
 
     <aside class="policy-note" aria-label="Trust and restart disclaimer">
       <div class="policy-symbol" aria-hidden="true">i</div>
-      <p><strong>System-wide trust change.</strong> Selected roots become trust anchors for applications using the system CA file. PEM bundles do not carry all Mozilla or Chrome browser-specific trust constraints. Apply is immediate; some running apps cache trust and may need to be relaunched or the TV rebooted.</p>
+      <p><strong>System-wide trust change.</strong> Selected roots become trust anchors for applications using the system CA file. PEM bundles do not carry all Mozilla or Chrome browser-specific trust constraints. Provider downloads are authenticated separately using stock trust plus a selected custom CA; those transport roots are not added to the applied bundle. Apply is immediate; some running apps cache trust and may need to be relaunched or the TV rebooted. Homebrew root execution is shared with other installed apps; install only apps you trust.</p>
     </aside>
 
     <footer class="footer">

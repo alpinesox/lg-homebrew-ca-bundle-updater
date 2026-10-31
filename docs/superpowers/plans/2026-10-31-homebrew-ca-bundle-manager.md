@@ -32,13 +32,13 @@
 - `bundle.sh` exports `ca_bundle_validate`, `ca_bundle_add_pem`, and `ca_bundle_add_chrome`; these functions do not mount or modify the system trust file.
 - `ca-manager.sh` exposes only the fixed actions `status`, `configure`, `apply`, `restore`, `boot-checks on|off`, `check`, and `startup`.
 
-- [ ] **Step 1: Write failing shell tests** for valid Mozilla/custom PEM union, duplicate cert removal by DER SHA-256, invalid PEM rejection, and Chrome constrained-root exclusion using generated test CA certificates.
-- [ ] **Step 2: Run `npm test`** and confirm the tests fail because the helper does not exist.
-- [ ] **Step 3: Implement strict configuration parsing and certificate splitting/validation** in `scripts/lib/bundle.sh`; no `eval`, `source`, or interpolation of user-supplied paths into shell code.
-- [ ] **Step 4: Implement Mozilla acquisition** from `https://curl.se/ca/cacert.pem` plus `.sha256`, requiring digest equality and successful OpenSSL parse before staging.
-- [ ] **Step 5: Implement Chrome acquisition** from official Gitiles `main` `root_store.certs` and `root_store.md`; parse only `Trusted Roots`, include only matching certificate DER hashes, and reject incomplete/mixed snapshots by comparing extracted and published root counts.
-- [ ] **Step 6: Implement custom PEM ingestion** from a readable absolute path; copy validated CA certificate bytes into managed state and deduplicate by SHA-256.
-- [ ] **Step 7: Run `npm test` and shell syntax checks**; require all tests to pass and malformed inputs to leave staged/active state unchanged.
+- [x] **Step 1: Write failing shell tests** for valid Mozilla/custom PEM union, duplicate cert removal by DER SHA-256, invalid PEM rejection, and Chrome constrained-root exclusion using generated test CA certificates.
+- [x] **Step 2: Run `npm test`** and confirm the tests fail because the helper does not exist.
+- [x] **Step 3: Implement strict configuration parsing and certificate splitting/validation** in `scripts/lib/bundle.sh`; no `eval`, `source`, or interpolation of user-supplied paths into shell code.
+- [x] **Step 4: Implement Mozilla acquisition** from `https://curl.se/ca/cacert.pem` plus `.sha256`, requiring digest equality and successful OpenSSL parse before staging.
+- [x] **Step 5: Implement Chrome acquisition** from official Gitiles `main` `root_store.certs` and `root_store.md`; parse only `Trusted Roots`, include only matching certificate DER hashes, and reject incomplete/mixed snapshots by comparing extracted and published root counts.
+- [x] **Step 6: Implement custom PEM ingestion** from a readable absolute path; copy validated CA certificate bytes into managed state and deduplicate by SHA-256.
+- [x] **Step 7: Run `npm test` and shell syntax checks**; require all tests to pass and malformed inputs to leave staged/active state unchanged.
 
 ### Task 2: Safe apply, restore, and boot-time check behavior
 
@@ -55,12 +55,12 @@
 - `restore` unmounts the target, disables both boot actions, removes the startup hook, and leaves all backups intact.
 - `boot-checks on|off` toggles checks independently of whether a bundle is applied.
 
-- [ ] **Step 1: Write failing lifecycle tests** for idempotent Apply, offline Restore, boot mount failure fallback, and update staging without active-bundle changes.
-- [ ] **Step 2: Run lifecycle tests** and confirm the expected failures.
-- [ ] **Step 3: Implement stock backup and bind-mount apply** with atomic files, hash verification, mount-state checks, and fallback to stock on failure.
-- [ ] **Step 4: Implement `restore`** so it needs no network, removes the startup link, clears active/boot-check flags, and verifies the original CA path is exposed.
-- [ ] **Step 5: Implement boot hook** that re-applies only the last approved bundle and runs source checks only when enabled; checks stage candidates and never auto-apply.
-- [ ] **Step 6: Run lifecycle tests and verify** malformed settings or failed downloads do not alter the current mounted bundle.
+- [x] **Step 1: Write failing lifecycle tests** for idempotent Apply, offline Restore, boot mount failure fallback, and update staging without active-bundle changes.
+- [x] **Step 2: Run lifecycle tests** and confirm the expected failures.
+- [x] **Step 3: Implement stock backup and bind-mount apply** with atomic files, hash verification, mount-state checks, and fallback to stock on failure.
+- [x] **Step 4: Implement `restore`** so it needs no network, removes the startup link, clears active/boot-check flags, and verifies the original CA path is exposed.
+- [x] **Step 5: Implement boot hook** that re-applies only the last approved bundle and runs source checks only when enabled; checks stage candidates and never auto-apply.
+- [x] **Step 6: Run lifecycle tests and verify** malformed settings or failed downloads do not alter the current mounted bundle.
 
 ### Task 3: webOS TV app UI and privileged-service integration
 
@@ -76,12 +76,12 @@
 - UI calls `luna://org.webosbrew.hbchannel.service/exec` with a fixed helper path/action; configuration is base64 data and is revalidated by the helper.
 - UI displays root/HBC availability, selected provider counts, active/staged state, last update result, and helper errors.
 
-- [ ] **Step 1: Create the app metadata and basic screen** with accessible focus order, remote-control navigation, Mozilla/Chrome/custom checkboxes, custom path field, Apply, boot-check toggle, Restore, and result status.
-- [ ] **Step 2: Add UI tests or a browser harness** for selection, validation, error display, and all three actions.
-- [ ] **Step 3: Implement the Homebrew Luna bridge** using fixed action strings and base64-encoded config data; do not use arbitrary UI-provided shell command fragments.
-- [ ] **Step 4: Wire Apply, boot checks, Restore, and status refresh** to helper responses and only show success after confirmed results.
-- [ ] **Step 5: Add clear warnings** that a PEM bundle cannot reproduce browser-specific external CA constraints and that applications may cache trust until relaunched.
-- [ ] **Step 6: Run frontend tests and inspect** that buttons and errors remain readable/focusable at TV resolution.
+- [x] **Step 1: Create the app metadata and basic screen** with accessible focus order, remote-control navigation, Mozilla/Chrome/custom checkboxes, custom path field, Apply, boot-check toggle, Restore, and result status.
+- [x] **Step 2: Add UI tests or a browser harness** for selection, validation, error display, and all three actions.
+- [x] **Step 3: Implement the Homebrew Luna bridge** using fixed action strings and base64-encoded config data; do not use arbitrary UI-provided shell command fragments.
+- [x] **Step 4: Wire Apply, boot checks, Restore, and status refresh** to helper responses and only show success after confirmed results.
+- [x] **Step 5: Add clear warnings** that a PEM bundle cannot reproduce browser-specific external CA constraints and that applications may cache trust until relaunched.
+- [x] **Step 6: Run frontend tests and inspect** that buttons and errors remain readable/focusable at TV resolution.
 
 ### Task 4: IPK packaging, CI, and catalog release metadata
 
@@ -99,12 +99,12 @@
 - `npm run package` stages only runtime files and creates the IPK with `ares-package`.
 - `npm run manifest` emits the Homebrew manifest with version, IPK URL/hash/size, `rootRequired`, and project/source URL.
 
-- [ ] **Step 1: Write build/manifest tests** that reject missing IPK, invalid app ID, and incorrect SHA-256 while accepting a correctly packaged artifact.
-- [ ] **Step 2: Implement packaging scripts** with a versioned app ID, reproducible output paths, and generated manifest metadata.
-- [ ] **Step 3: Configure CI** to run tests, package the IPK, and inspect the IPK contents without publishing on ordinary branches.
-- [ ] **Step 4: Configure tagged releases** to publish the IPK and manifest only after CI succeeds.
-- [ ] **Step 5: Write user documentation** for root/HBC prerequisites, source choices, constraints caveat, apply/restore, boot checks, rollback, and known limitations.
-- [ ] **Step 6: Run the complete test/build suite** and verify package metadata, manifest digest, and packaged file list.
+- [x] **Step 1: Write build/manifest tests** that reject missing IPK, invalid app ID, and incorrect SHA-256 while accepting a correctly packaged artifact.
+- [x] **Step 2: Implement packaging scripts** with a versioned app ID, reproducible output paths, and generated manifest metadata.
+- [x] **Step 3: Configure CI** to run tests, package the IPK, and inspect the IPK contents without publishing on ordinary branches.
+- [x] **Step 4: Configure tagged releases** to publish the IPK and manifest only after CI succeeds.
+- [x] **Step 5: Write user documentation** for root/HBC prerequisites, source choices, constraints caveat, apply/restore, boot checks, rollback, and known limitations.
+- [x] **Step 6: Run the complete test/build suite** and verify package metadata, manifest digest, and packaged file list.
 
 ### Task 5: Device validation and Homebrew catalog submission
 

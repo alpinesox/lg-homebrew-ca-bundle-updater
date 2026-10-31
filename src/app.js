@@ -2,7 +2,8 @@
   "use strict";
 
   var service = "luna://org.webosbrew.hbchannel.service";
-  var helper = "/media/developer/apps/usr/palm/applications/com.alpinesox.cabundlemanager/scripts/ca-manager.sh";
+  var bootstrapper = "sh /media/developer/apps/usr/palm/applications/com.alpinesox.cabundlemanager/scripts/ca-manager.sh";
+  var helper = null;
   var config = window.CABundleConfig;
   var ids = ["apply-button", "boot-checks-button", "restore-button"];
   var busy = false;
@@ -31,22 +32,39 @@
   }
 
   function serviceCall(action, payload, callback, spawn) {
-    var command = helper + " " + action;
+    var executable = action === "bootstrap" ? bootstrapper : helper;
+    if (!executable) {
+      callback(new Error("The root helper has not been bootstrapped yet."));
+      return;
+    }
+    var command = executable + " " + action;
     var output = "";
     var completed = false;
     if (payload) {
       command += " " + (action === "configure" ? config.encodeBase64(payload) : payload);
     }
+    if (typeof webOS === "undefined" || !webOS.service || typeof webOS.service.request !== "function") {
+      callback(new Error("Homebrew Channel root service is unavailable."));
+      return;
+    }
+    var parameters = { command: command };
+    if (spawn) parameters.subscribe = true;
     try {
       webOS.service.request(service, {
         method: spawn ? "spawn" : "exec",
-        parameters: { command: command },
+        parameters: parameters,
         onSuccess: function (response) {
           if (spawn) {
             if (!response || completed) return;
-            if (response.type === "stdoutData") output += response.stdoutString || "";
-            if (response.type === "stderrData") output += response.stderrString || "";
-            if (response.type === "exit" || response.type === "close") {
+            var eventType = response.event || response.type;
+            if (eventType === "stdoutData") output += response.stdoutString || "";
+            if (eventType === "stderrData") output += response.stderrString || "";
+            if (response.error || response.returnValue === false) {
+              completed = true;
+              callback(new Error(response.errorText || response.error || output || "Root helper failed."), output);
+              return;
+            }
+            if (eventType === "exit" || eventType === "close") {
               completed = true;
               var code = response.exitCode !== undefined ? response.exitCode : response.closeCode;
               callback(code === 0 ? null : new Error(output || "Root helper failed."), output);
@@ -85,10 +103,14 @@
     byId("custom-risk").hidden = !byId("source-custom").checked;
     byId("certificate-count").textContent = state.certificate_count || "—";
     byId("active-hash").textContent = state.active_sha256 || "Not applied";
-    byId("active-indicator").textContent = state.mounted === "1" ? "APPLIED" : "STOCK";
-    byId("active-indicator").className = state.mounted === "1" ? "active-indicator applied" : "active-indicator";
+    var foreignMount = state.foreign_mount === "1";
+    byId("active-indicator").textContent = foreignMount ? "OTHER OVERLAY" : (state.mounted === "1" ? "APPLIED" : "STOCK");
+    byId("active-indicator").className = foreignMount ? "active-indicator conflict" : (state.mounted === "1" ? "active-indicator applied" : "active-indicator");
     byId("staged-note").hidden = state.staged !== "1";
     byId("boot-checks-button").textContent = state.boot_checks === "1" ? "Disable boot-time checks" : "Enable boot-time checks";
+    byId("apply-button").disabled = foreignMount;
+    byId("restore-button").disabled = foreignMount;
+    if (foreignMount) setMessage("Another CA overlay is mounted. Remove or restore it before applying this bundle.", true);
     updateBootCheckMessage(state);
     showConnection(true, "Root service ready");
   }
@@ -98,7 +120,23 @@
   }
 
   function refresh() {
-    serviceCall("status", "", function (error, text) {
+    serviceCall("bootstrap", "", function (bootstrapError, bootstrapOutput) {
+      if (bootstrapError) {
+        rootStatus = null;
+        showConnection(false, "Homebrew root service unavailable");
+        setMessage(bootstrapError.message, true);
+        return;
+      }
+      var bootstrapState = config.parseStatus(bootstrapOutput);
+      var helperPath = bootstrapState.helper_path || "";
+      if (!/^\/var\/lib\/webosbrew\/ca-bundle-manager\/releases\/[0-9a-f]{64}\/ca-manager\.sh$/.test(helperPath)) {
+        rootStatus = null;
+        showConnection(false, "Root helper bootstrap failed");
+        setMessage("Homebrew did not return a valid protected-helper path.", true);
+        return;
+      }
+      helper = helperPath;
+      serviceCall("status", "", function (error, text) {
       if (error) {
         rootStatus = null;
         showConnection(false, "Homebrew root access unavailable");
@@ -106,6 +144,7 @@
         return;
       }
       applyStatus(text);
+      });
     });
   }
 
@@ -121,6 +160,10 @@
   function applySelected() {
     var config;
     if (busy) return;
+    if (!rootStatus) {
+      setMessage("Wait for Homebrew root access to be checked.", true);
+      return;
+    }
     try {
       config = selectionPayload();
     } catch (error) {
@@ -150,6 +193,10 @@
 
   function toggleBootChecks() {
     if (busy) return;
+    if (!rootStatus) {
+      setMessage("Wait for Homebrew root access to be checked.", true);
+      return;
+    }
     var enabled = rootStatus && rootStatus.boot_checks === "1";
     setBusy(true);
     serviceCall("boot-checks", enabled ? "off" : "on", function (error, text) {
@@ -161,6 +208,10 @@
 
   function restoreStock() {
     if (busy) return;
+    if (!rootStatus) {
+      setMessage("Wait for Homebrew root access to be checked.", true);
+      return;
+    }
     if (!window.confirm("Restore the TV's stock CA bundle and disable boot-time checks? The original firmware file will not be changed.")) return;
     setBusy(true);
     serviceCall("restore", "", function (error, text) {

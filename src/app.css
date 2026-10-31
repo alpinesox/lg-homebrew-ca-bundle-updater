@@ -43,7 +43,7 @@ input {
 .shell {
   width: min(100% - 7rem, 1440px);
   margin: 0 auto;
-  padding: 4.5rem 0 2.5rem;
+  padding: 3.5rem 0 1.5rem;
 }
 
 .masthead {
@@ -322,6 +322,11 @@ h2 {
   background: rgba(213, 243, 107, 0.1);
 }
 
+.active-indicator.conflict {
+  color: var(--amber);
+  background: rgba(243, 191, 105, 0.12);
+}
+
 .metric-row {
   display: flex;
   align-items: center;
@@ -375,6 +380,10 @@ h2 {
   color: #f7d7a0;
   background: rgba(91, 65, 31, 0.22);
   font-size: 0.82rem;
+}
+
+.staged-note[hidden] {
+  display: none;
 }
 
 .staged-mark {
