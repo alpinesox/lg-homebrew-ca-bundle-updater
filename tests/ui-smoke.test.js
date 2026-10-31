@@ -99,6 +99,7 @@ element("boot-checks-button").trigger("click");
 assert.equal(element("active-indicator").textContent, "OTHER OVERLAY");
 assert.equal(element("apply-button").disabled, true);
 assert.equal(element("restore-button").disabled, true);
+assert.equal(element("boot-checks-button").disabled, true);
 assert.match(element("action-result").textContent, /Another CA overlay is mounted/);
 
 console.log("UI smoke tests passed");

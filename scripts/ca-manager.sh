@@ -512,8 +512,13 @@ remove_hook() {
 }
 
 run_apply() {
-    ensure_state && ensure_stock || return 1
+    ensure_state || return 1
     load_config || return 1
+    if target_is_foreign_mount; then
+        fail 'A foreign CA overlay is mounted; remove it before applying this bundle.'
+        return 1
+    fi
+    ensure_stock || return 1
     refresh_sources || { fail 'Could not refresh selected sources; active trust was not changed.'; return 1; }
     apply_candidate=$STATE/apply-candidate.$$
     build_candidate "$apply_candidate" || { fail 'The selected sources did not produce a valid CA bundle.'; return 1; }
@@ -613,8 +618,14 @@ run_apply() {
 }
 
 run_check() {
-    ensure_state && ensure_stock || return 1
+    ensure_state || return 1
     load_config || return 1
+    if target_is_foreign_mount; then
+        set_last_check source-error || true
+        fail 'A foreign CA overlay is mounted; remove it before checking sources.'
+        return 1
+    fi
+    ensure_stock || return 1
     if ! refresh_sources; then
         set_last_check source-error || true
         echo 'Source check failed; active trust was not changed.'
@@ -722,6 +733,10 @@ run_boot_checks() {
     load_config || return 1
     previous_boot_checks=$boot_checks
     case "${1:-}" in on) boot_checks=1 ;; off) boot_checks=0 ;; *) fail 'Use boot-checks on|off.'; return 1 ;; esac
+    if [ "$boot_checks" = 1 ] && target_is_foreign_mount; then
+        fail 'A foreign CA overlay is mounted; remove it before enabling boot checks.'
+        return 1
+    fi
     save_config || return 1
     if [ "$active" = 1 ] || [ "$boot_checks" = 1 ]; then
         if ! install_hook; then

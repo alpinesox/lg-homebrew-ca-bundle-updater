@@ -110,6 +110,7 @@
     byId("boot-checks-button").textContent = state.boot_checks === "1" ? "Disable boot-time checks" : "Enable boot-time checks";
     byId("apply-button").disabled = foreignMount;
     byId("restore-button").disabled = foreignMount;
+    byId("boot-checks-button").disabled = busy || foreignMount;
     if (foreignMount) setMessage("Another CA overlay is mounted. Remove or restore it before applying this bundle.", true);
     updateBootCheckMessage(state);
     showConnection(true, "Root service ready");

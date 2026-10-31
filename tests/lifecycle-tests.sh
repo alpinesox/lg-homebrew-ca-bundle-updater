@@ -71,10 +71,20 @@ touch "$STATE/test-foreign-mounted"
 status=$(run_manager status)
 printf '%s\n' "$status" | grep -qx 'mounted=0'
 printf '%s\n' "$status" | grep -qx 'foreign_mount=1'
+if run_manager apply; then
+    echo 'Apply unexpectedly replaced a foreign CA mount' >&2
+    exit 1
+fi
 if run_manager restore; then
     echo 'Restore unexpectedly unmounted a foreign CA mount' >&2
     exit 1
 fi
+if run_manager boot-checks on; then
+    echo 'Boot checks unexpectedly enabled over a foreign CA mount' >&2
+    exit 1
+fi
+status=$(run_manager status)
+printf '%s\n' "$status" | grep -qx 'boot_checks=0'
 rm -f "$STATE/test-foreign-mounted"
 
 previous_hash=$(sha256sum "$STATE/active-ca.pem" | awk '{print $1}')
