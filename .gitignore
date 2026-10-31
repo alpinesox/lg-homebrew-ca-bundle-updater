@@ -1,0 +1,7 @@
+node_modules/
+dist/
+build/
+manifest.json
+*.ipk
+*.log
+.DS_Store

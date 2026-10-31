@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#10191c">
+  <title>CA Bundle Manager</title>
+  <link rel="stylesheet" href="src/app.css">
+  <script src="src/config.js" defer></script>
+  <script src="src/app.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="masthead">
+      <div>
+        <p class="eyebrow">ROOTED WEBOS · SYSTEM TRUST</p>
+        <h1>CA Bundle <span>Manager</span></h1>
+        <p class="lede">Choose the certificate roots this TV will trust. Nothing changes until you apply it.</p>
+      </div>
+      <div class="status-chip" id="connection-status" role="status" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="connection-label">Checking Homebrew access</span>
+      </div>
+    </header>
+
+    <section class="layout" aria-label="Trust settings">
+      <section class="panel sources-panel" aria-labelledby="sources-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">01 / SELECT TRUST SOURCES</p>
+            <h2 id="sources-title">Build your bundle</h2>
+          </div>
+          <span class="selection-note">Mozilla is the baseline</span>
+        </div>
+
+        <label class="source-row" for="source-mozilla">
+          <input id="source-mozilla" type="checkbox" checked>
+          <span class="checkmark" aria-hidden="true"></span>
+          <span class="source-copy">
+            <strong>Mozilla Root Store</strong>
+            <span>Current public roots, exported as PEM by curl.se.</span>
+          </span>
+          <span class="source-tag">BASELINE</span>
+        </label>
+
+        <label class="source-row" for="source-chrome">
+          <input id="source-chrome" type="checkbox">
+          <span class="checkmark" aria-hidden="true"></span>
+          <span class="source-copy">
+            <strong>Chrome Root Store</strong>
+            <span>Unconstrained roots only. Chrome-specific verifier rules are not included.</span>
+          </span>
+          <span class="source-tag source-tag-muted">OPTIONAL</span>
+        </label>
+
+        <label class="source-row" for="source-custom">
+          <input id="source-custom" type="checkbox">
+          <span class="checkmark" aria-hidden="true"></span>
+          <span class="source-copy">
+            <strong>Custom PEM file</strong>
+            <span>For a private CA, such as your own TLS inspection network.</span>
+          </span>
+          <span class="source-tag source-tag-muted">OPTIONAL</span>
+        </label>
+
+        <div class="custom-path" id="custom-path-container">
+          <label for="custom-path">Absolute path on the TV</label>
+          <input id="custom-path" type="text" autocomplete="off" spellcheck="false" placeholder="/media/developer/your-network-ca.pem" disabled>
+          <p class="field-hint">PEM CA certificates only. The file is copied into managed storage when applied.</p>
+          <p class="custom-risk" id="custom-risk" hidden>Anyone with this CA's private key may inspect TLS traffic trusted through it.</p>
+        </div>
+
+        <div class="source-footnote">
+          <span class="footnote-mark" aria-hidden="true">!</span>
+          <p>Apple does not publish a complete Apple-device trust bundle. If you have an Apple-sourced PEM, add it as a custom file.</p>
+        </div>
+      </section>
+
+      <section class="panel active-panel" aria-labelledby="active-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">02 / CURRENT SYSTEM TRUST</p>
+            <h2 id="active-title">Applied bundle</h2>
+          </div>
+          <span class="active-indicator" id="active-indicator">STOCK</span>
+        </div>
+
+        <div class="metric-row">
+          <span class="metric-number" id="certificate-count">—</span>
+          <span class="metric-label">certificates<br>in active bundle</span>
+        </div>
+        <div class="fingerprint-block">
+          <span class="eyebrow">SHA-256</span>
+          <code id="active-hash">Not applied</code>
+        </div>
+
+        <div class="staged-note" id="staged-note" hidden>
+          <span class="staged-mark" aria-hidden="true">↗</span>
+          <span>A source update is staged. Press Apply to activate it.</span>
+        </div>
+
+        <button class="button button-primary" id="apply-button" type="button">Apply selected roots</button>
+        <button class="button button-secondary" id="boot-checks-button" type="button">Enable boot-time checks</button>
+        <p class="boot-check-result" id="boot-check-result" role="status" aria-live="polite">Boot check has not run.</p>
+        <button class="button button-quiet" id="restore-button" type="button">Restore stock trust</button>
+        <p class="action-result" id="action-result" role="status" aria-live="polite">No changes made.</p>
+      </section>
+    </section>
+
+    <aside class="policy-note" aria-label="Trust and restart disclaimer">
+      <div class="policy-symbol" aria-hidden="true">i</div>
+      <p><strong>System-wide trust change.</strong> Selected roots become trust anchors for applications using the system CA file. PEM bundles do not carry all Mozilla or Chrome browser-specific trust constraints. Apply is immediate; some running apps cache trust and may need to be relaunched or the TV rebooted.</p>
+    </aside>
+
+    <footer class="footer">
+      <span>CA BUNDLE MANAGER <span class="footer-sep">/</span> OPEN SOURCE</span>
+      <span>Root access via Homebrew Channel required</span>
+    </footer>
+  </main>
+</body>
+</html>

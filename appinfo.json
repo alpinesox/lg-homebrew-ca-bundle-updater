@@ -1,0 +1,13 @@
+{
+  "id": "com.alpinesox.cabundlemanager",
+  "version": "0.1.0",
+  "vendor": "AlpineSox",
+  "type": "web",
+  "main": "index.html",
+  "title": "CA Bundle Manager",
+  "icon": "assets/icon.png",
+  "largeIcon": "assets/icon.png",
+  "appDescription": "Choose, apply, and manage CA trust bundles on rooted webOS TVs.",
+  "uiRevision": 2,
+  "iconColor": "#142126"
+}
