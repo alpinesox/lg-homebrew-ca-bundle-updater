@@ -178,6 +178,28 @@ remove_hook_if_unused() {
     if [ "$active" = 0 ] && [ "$boot_checks" = 0 ]; then remove_hook; fi
 }
 
+apply_abort_before_replace() {
+    reason=$1
+    rm -f "$STATE/active-ca.tmp.$$" "$apply_candidate"
+    rollback_ok=1
+    if [ "$previous_active" = 1 ]; then
+        if [ -s "$STATE/previous-ca.pem" ]; then
+            cp -f "$STATE/previous-ca.pem" "$ACTIVE" || rollback_ok=0
+        fi
+        if [ "$rollback_ok" = 1 ]; then manager_mount "$ACTIVE" || rollback_ok=0; fi
+    else
+        remove_hook_if_unused || rollback_ok=0
+    fi
+    if [ "$rollback_ok" = 1 ] && [ "$previous_active" = 1 ]; then
+        fail "$reason; the previous approved bundle was restored."
+    elif [ "$rollback_ok" = 1 ]; then
+        fail "$reason; stock trust remains active."
+    else
+        fail "$reason; rollback was incomplete. The previous approved bundle will be retried at boot when possible."
+    fi
+    return 1
+}
+
 parse_selection() {
     input_file=$1
     mozilla=
@@ -534,9 +556,17 @@ run_apply() {
         fi
         return 1
     fi
-    cp "$apply_candidate" "$STATE/active-ca.tmp.$$" || { rm -f "$apply_candidate"; return 1; }
+    if [ "${CA_MANAGER_TESTING:-0}" = 1 ] && [ "${CA_MANAGER_TEST_FAIL_ACTIVE_COPY:-0}" = 1 ]; then
+        apply_abort_before_replace 'Could not stage the active bundle'
+        return 1
+    fi
+    cp "$apply_candidate" "$STATE/active-ca.tmp.$$" || { apply_abort_before_replace 'Could not stage the active bundle'; return 1; }
     rm -f "$apply_candidate"
-    mv -f "$STATE/active-ca.tmp.$$" "$ACTIVE" || { rm -f "$STATE/active-ca.tmp.$$"; return 1; }
+    if [ "${CA_MANAGER_TESTING:-0}" = 1 ] && [ "${CA_MANAGER_TEST_FAIL_ACTIVE_RENAME:-0}" = 1 ]; then
+        apply_abort_before_replace 'Could not activate the staged file'
+        return 1
+    fi
+    mv -f "$STATE/active-ca.tmp.$$" "$ACTIVE" || { apply_abort_before_replace 'Could not activate the staged file'; return 1; }
     if ! manager_mount "$ACTIVE"; then
         rollback_ok=1
         if [ "$previous_active" = 1 ] && [ -s "$STATE/previous-ca.pem" ]; then

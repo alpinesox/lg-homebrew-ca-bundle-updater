@@ -79,6 +79,19 @@ rm -f "$STATE/test-foreign-mounted"
 
 previous_hash=$(sha256sum "$STATE/active-ca.pem" | awk '{print $1}')
 target_hash=$(sha256sum "$TARGET" | awk '{print $1}')
+make_ca FileFailureFixture "$STATE/sources/mozilla.pem"
+if CA_MANAGER_TEST_FAIL_ACTIVE_COPY=1 run_manager apply; then
+    echo 'Apply unexpectedly succeeded with active-copy failure injection' >&2
+    exit 1
+fi
+test "$(sha256sum "$STATE/active-ca.pem" | awk '{print $1}')" = "$previous_hash"
+test "$(sha256sum "$TARGET" | awk '{print $1}')" = "$target_hash"
+if CA_MANAGER_TEST_FAIL_ACTIVE_RENAME=1 run_manager apply; then
+    echo 'Apply unexpectedly succeeded with active-rename failure injection' >&2
+    exit 1
+fi
+test "$(sha256sum "$STATE/active-ca.pem" | awk '{print $1}')" = "$previous_hash"
+test "$(sha256sum "$TARGET" | awk '{print $1}')" = "$target_hash"
 if CA_MANAGER_TEST_FAIL_UNMOUNT=1 run_manager apply; then
     echo 'Apply unexpectedly succeeded with unmount failure injection' >&2
     exit 1
