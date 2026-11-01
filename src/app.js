@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var service = "luna://org.webosbrew.hbchannel.service";
+  var service = "luna://org.webosbrew.hbchannel.service/";
   var bootstrapper = "sh /media/developer/apps/usr/palm/applications/com.alpinesox.cabundlemanager/scripts/ca-manager.sh";
   var helper = null;
   var config = window.CABundleConfig;
@@ -23,8 +23,9 @@
     var i;
     var inputIds = ["source-mozilla", "source-chrome", "source-custom", "custom-path"];
     busy = value;
+    var actionUnavailable = value || !rootStatus || (rootStatus && rootStatus.foreign_mount === "1");
     for (i = 0; i < ids.length; i += 1) {
-      byId(ids[i]).disabled = value;
+      byId(ids[i]).disabled = actionUnavailable;
     }
     for (i = 0; i < inputIds.length; i += 1) {
       byId(inputIds[i]).disabled = value || (inputIds[i] === "custom-path" && !byId("source-custom").checked);
@@ -50,8 +51,7 @@
     var parameters = { command: command };
     if (spawn) parameters.subscribe = true;
     try {
-      webOS.service.request(service, {
-        method: spawn ? "spawn" : "exec",
+      webOS.service.request(service + (spawn ? "spawn" : "exec"), {
         parameters: parameters,
         onSuccess: function (response) {
           if (spawn) {
@@ -126,6 +126,7 @@
         rootStatus = null;
         showConnection(false, "Homebrew root service unavailable");
         setMessage(bootstrapError.message, true);
+        setBusy(false);
         return;
       }
       var bootstrapState = config.parseStatus(bootstrapOutput);
@@ -134,6 +135,7 @@
         rootStatus = null;
         showConnection(false, "Root helper bootstrap failed");
         setMessage("Homebrew did not return a valid protected-helper path.", true);
+        setBusy(false);
         return;
       }
       helper = helperPath;
@@ -142,6 +144,7 @@
         rootStatus = null;
         showConnection(false, "Homebrew root access unavailable");
         setMessage(error.message, true);
+        setBusy(false);
         return;
       }
       applyStatus(text);
@@ -231,6 +234,7 @@
     byId("apply-button").addEventListener("click", applySelected);
     byId("boot-checks-button").addEventListener("click", toggleBootChecks);
     byId("restore-button").addEventListener("click", restoreStock);
+    setBusy(false);
     refresh();
   }
 

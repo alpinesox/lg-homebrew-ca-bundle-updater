@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build an open-source Homebrew Channel app for rooted LG webOS TVs that lets users choose CA sources, explicitly apply a merged system bundle, and optionally check for source updates at boot.
+Build an open-source Homebrew Channel app for LG webOS TVs that lets users choose CA sources, explicitly apply a merged system bundle, and optionally check for source updates at boot. The UI checks whether elevated Homebrew execution is available and warns/disables actions when it is not.
 
 ## Scope
 
@@ -15,7 +15,7 @@ Build an open-source Homebrew Channel app for rooted LG webOS TVs that lets user
 
 ## Trust semantics
 
-The app does not silently select additional providers. Mozilla is selected by default; Chrome and custom roots are opt-in. The active bundle is exactly the deduplicated union of the selected source certificates.
+The app does not silently select additional providers. The Mozilla checkbox is initially checked in the UI; Chrome and custom roots are opt-in. The active bundle is exactly the deduplicated union of the selected source certificates.
 
 Mozilla and Chrome root-program constraints and trust-purpose metadata are not all representable in a plain PEM CA file. curl.se explicitly documents that its Mozilla PEM export omits Firefox's external constraints. The UI and README must explain that the resulting system trust anchors may be broader than browser-specific policy. Chrome constrained roots are excluded, but the remaining Chrome roots still do not reproduce Chrome's complete verifier policy.
 

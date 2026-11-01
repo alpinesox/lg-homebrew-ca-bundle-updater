@@ -24,7 +24,6 @@ function createManifest(app, ipk) {
     ipkHash: { sha256 },
     ipkSize: ipk.length,
     installedSize: ipk.length,
-    rootRequired: true,
     sourceUrl: `https://github.com/${REPOSITORY}`
   };
 }

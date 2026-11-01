@@ -2,7 +2,7 @@
 
 > **For agentic workers:** Execute this plan inline, task by task. Each task must leave a runnable verification result.
 
-**Goal:** Build and publish a rooted webOS Homebrew app for selecting Mozilla, Chrome-unconstrained, and custom CA sources, applying the selected bundle, and optionally staging source updates at boot.
+**Goal:** Build and publish a webOS Homebrew app for selecting Mozilla, Chrome-unconstrained, and custom CA sources, applying the selected bundle, and optionally staging source updates at boot.
 
 **Architecture:** A TV-friendly webOS app UI talks to the rooted Homebrew Channel Luna execution service using fixed helper actions. A root shell helper validates source data, builds a deterministic PEM bundle, applies it by bind mount, and is called by a Homebrew startup hook; boot checks stage updates but never auto-apply them.
 
@@ -76,7 +76,7 @@
 - UI calls `luna://org.webosbrew.hbchannel.service/exec` with a fixed helper path/action; configuration is base64 data and is revalidated by the helper.
 - UI displays root/HBC availability, selected provider counts, active/staged state, last update result, and helper errors.
 
-- [x] **Step 1: Create the app metadata and basic screen** with accessible focus order, remote-control navigation, Mozilla/Chrome/custom checkboxes, custom path field, Apply, boot-check toggle, Restore, and result status.
+- [x] **Step 1: Create the app metadata and basic screen** with accessible focus order, remote-control navigation, Mozilla/Chrome/custom checkboxes, custom path field, Apply, boot-check toggle, Restore, and result status; provider checkboxes are usable without root access, while privileged actions wait for the runtime root-service check.
 - [x] **Step 2: Add UI tests or a browser harness** for selection, validation, error display, and all three actions.
 - [x] **Step 3: Implement the Homebrew Luna bridge** using fixed action strings and base64-encoded config data; do not use arbitrary UI-provided shell command fragments.
 - [x] **Step 4: Wire Apply, boot checks, Restore, and status refresh** to helper responses and only show success after confirmed results.
@@ -97,7 +97,7 @@
 **Interfaces:**
 - `npm test` runs local tests and shell checks.
 - `npm run package` stages only runtime files and creates the IPK with `ares-package`.
-- `npm run manifest` emits the Homebrew manifest with version, IPK URL/hash/size, `rootRequired`, and project/source URL.
+- `npm run manifest` emits the Homebrew manifest with version, IPK URL/hash/size, and project/source URL.
 
 - [x] **Step 1: Write build/manifest tests** that reject missing IPK, invalid app ID, and incorrect SHA-256 while accepting a correctly packaged artifact.
 - [x] **Step 2: Implement packaging scripts** with a versioned app ID, reproducible output paths, and generated manifest metadata.

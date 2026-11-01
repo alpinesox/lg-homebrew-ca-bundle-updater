@@ -1,10 +1,10 @@
 # CA Bundle Manager for webOS
 
-A rooted webOS Homebrew app for selecting CA sources, explicitly applying their certificates as system trust anchors, and optionally checking for upstream source updates at boot.
+A webOS Homebrew app for selecting CA sources, explicitly applying their certificates as system trust anchors, and optionally checking for upstream source updates at boot.
 
 ## Requirements
 
-- A rooted LG webOS TV.
+- An LG webOS TV with Homebrew Channel installed. The app checks for Homebrew's root service when opened; privileged actions are unavailable if it cannot be reached.
 - Homebrew Channel installed and its root execution service available.
 - A writable `/media/developer` partition and the Homebrew startup-script mechanism.
 - `curl`, `openssl`, `sha256sum`, `base64`, `awk`, `mount`, `umount`, `findmnt`, `stat`, and `nohup` on the TV.

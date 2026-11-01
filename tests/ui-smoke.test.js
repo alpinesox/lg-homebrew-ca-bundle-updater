@@ -5,7 +5,7 @@ const fs = require("node:fs");
 const vm = require("node:vm");
 const elements = Object.create(null);
 const calls = [];
-const methods = [];
+const uris = [];
 let foreignMount = "0";
 
 function element(id) {
@@ -42,9 +42,10 @@ const context = {
   webOS: {
     service: {
       request(uri, options) {
+        assert.equal(uri, "luna://org.webosbrew.hbchannel.service/" + (options.parameters.subscribe ? "spawn" : "exec"));
         calls.push(options.parameters.command);
-        methods.push(options.method);
-        if (options.method === "spawn") {
+        uris.push(uri);
+        if (options.parameters.subscribe) {
           assert.equal(options.parameters.subscribe, true);
           options.onSuccess({ event: "stdoutData", stdoutString: "Applied fixture bundle." });
           options.onSuccess({ event: "exit", exitCode: 0 });
@@ -71,9 +72,14 @@ const context = {
   unescape
 };
 context.window = context;
-vm.runInNewContext(fs.readFileSync("src/config.js", "utf8"), context);
-vm.runInNewContext(fs.readFileSync("src/app.js", "utf8"), context);
-document.ready();
+function loadUi(targetContext, targetDocument) {
+  targetContext.window = targetContext;
+  vm.runInNewContext(fs.readFileSync("src/config.js", "utf8"), targetContext);
+  vm.runInNewContext(fs.readFileSync("src/app.js", "utf8"), targetContext);
+  targetDocument.ready();
+}
+
+loadUi(context, document);
 
 assert.equal(element("source-mozilla").checked, true);
 element("source-chrome").checked = true;
@@ -88,7 +94,7 @@ const payload = Buffer.from(configureCommand.split(" ").pop(), "base64").toStrin
 const customB64 = payload.match(/custom_path_b64=([^\n]+)/)[1];
 assert.equal(Buffer.from(customB64, "base64").toString(), "/media/developer/TLS inspection; custom.pem");
 assert.ok(calls.some(command => command.endsWith(" apply")));
-assert.ok(methods.includes("spawn"));
+assert.ok(uris.includes("luna://org.webosbrew.hbchannel.service/spawn"));
 
 element("boot-checks-button").trigger("click");
 assert.ok(calls.some(command => command.endsWith(" boot-checks on")));
@@ -101,5 +107,26 @@ assert.equal(element("apply-button").disabled, true);
 assert.equal(element("restore-button").disabled, true);
 assert.equal(element("boot-checks-button").disabled, true);
 assert.match(element("action-result").textContent, /Another CA overlay is mounted/);
+
+const unavailableElements = Object.create(null);
+const unavailableDocument = {
+  addEventListener(name, handler) {
+    if (name === "DOMContentLoaded") this.ready = handler;
+  },
+  getElementById(id) {
+    if (!unavailableElements[id]) unavailableElements[id] = Object.assign({}, element(id), { handlers: Object.create(null) });
+    return unavailableElements[id];
+  }
+};
+const unavailableContext = Object.assign({}, context, {
+  document: unavailableDocument,
+  webOS: { service: { request(_uri, options) { options.onFailure({ errorText: "Service denied the request." }); } } }
+});
+loadUi(unavailableContext, unavailableDocument);
+assert.equal(unavailableDocument.getElementById("apply-button").disabled, true);
+assert.equal(unavailableDocument.getElementById("boot-checks-button").disabled, true);
+assert.equal(unavailableDocument.getElementById("restore-button").disabled, true);
+assert.equal(unavailableDocument.getElementById("connection-label").textContent, "Homebrew root service unavailable");
+assert.match(unavailableDocument.getElementById("action-result").textContent, /Service denied the request/);
 
 console.log("UI smoke tests passed");
