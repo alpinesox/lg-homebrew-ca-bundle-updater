@@ -51,7 +51,8 @@
     var parameters = { command: command };
     if (spawn) parameters.subscribe = true;
     try {
-      webOS.service.request(service + (spawn ? "spawn" : "exec"), {
+      webOS.service.request(service, {
+        method: spawn ? "spawn" : "exec",
         parameters: parameters,
         onSuccess: function (response) {
           if (spawn) {

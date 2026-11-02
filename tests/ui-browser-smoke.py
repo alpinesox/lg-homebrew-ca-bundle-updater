@@ -23,8 +23,8 @@ def main():
               return key + '=' + window.__manager[key];
             }).join('\\n') + '\\n';
           }
-          window.webOS = { service: { request: function (uri, options) {
-            if (uri !== 'luna://org.webosbrew.hbchannel.service/' + (options.parameters.subscribe ? 'spawn' : 'exec')) {
+          window.__mockWebOS = { service: { request: function (uri, options) {
+            if (uri !== 'luna://org.webosbrew.hbchannel.service/' || options.method !== (options.parameters.subscribe ? 'spawn' : 'exec')) {
               throw new Error('Unexpected Homebrew service URI: ' + uri);
             }
             var command = options.parameters.command;
@@ -74,9 +74,17 @@ def main():
             options.onSuccess({ returnValue: false, error: 'Unexpected helper action.' });
           } } };
         """)
+        page.add_init_script("""
+          Object.defineProperty(window, 'webOS', {
+            configurable: true,
+            get: function () { return this.__mockWebOS; },
+            set: function (value) { this.__realWebOS = value; }
+          });
+        """)
         page.on("pageerror", lambda error: errors.append(str(error)))
         page.goto(app)
         page.wait_for_load_state("networkidle")
+        page.wait_for_function("document.getElementById('connection-label').textContent === 'Root service ready'")
 
         assert page.get_by_role("heading", name="CA Bundle Manager").is_visible()
         assert page.get_by_role("button", name="Apply selected roots").is_visible()
@@ -90,7 +98,7 @@ def main():
         page.get_by_text("Custom PEM file", exact=True).click()
         assert page.locator("#custom-path").is_disabled()
 
-        page.locator("#apply-button").focus()
+        page.locator("#apply-button").evaluate("element => element.focus()")
         assert page.evaluate("document.activeElement.id") == "apply-button"
         assert page.evaluate("document.documentElement.scrollWidth") <= 1920
         assert page.evaluate("document.documentElement.scrollHeight") <= 1080

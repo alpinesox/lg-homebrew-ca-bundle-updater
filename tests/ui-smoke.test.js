@@ -2,6 +2,9 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const html = fs.readFileSync("index.html", "utf8");
+assert.ok(html.indexOf("src/webOSTV.js") !== -1);
+assert.ok(html.indexOf("src/webOSTV.js") < html.indexOf("src/app.js"));
 const vm = require("node:vm");
 const elements = Object.create(null);
 const calls = [];
@@ -42,7 +45,8 @@ const context = {
   webOS: {
     service: {
       request(uri, options) {
-        assert.equal(uri, "luna://org.webosbrew.hbchannel.service/" + (options.parameters.subscribe ? "spawn" : "exec"));
+        assert.equal(uri, "luna://org.webosbrew.hbchannel.service/");
+        assert.equal(options.method, options.parameters.subscribe ? "spawn" : "exec");
         calls.push(options.parameters.command);
         uris.push(uri);
         if (options.parameters.subscribe) {
@@ -94,7 +98,7 @@ const payload = Buffer.from(configureCommand.split(" ").pop(), "base64").toStrin
 const customB64 = payload.match(/custom_path_b64=([^\n]+)/)[1];
 assert.equal(Buffer.from(customB64, "base64").toString(), "/media/developer/TLS inspection; custom.pem");
 assert.ok(calls.some(command => command.endsWith(" apply")));
-assert.ok(uris.includes("luna://org.webosbrew.hbchannel.service/spawn"));
+assert.ok(uris.includes("luna://org.webosbrew.hbchannel.service/"));
 
 element("boot-checks-button").trigger("click");
 assert.ok(calls.some(command => command.endsWith(" boot-checks on")));
