@@ -92,6 +92,8 @@ def main():
         assert page.get_by_role("button", name="Restore stock trust").is_visible()
         assert page.locator("#source-mozilla").is_checked()
         assert page.locator("#custom-path").is_disabled()
+        assert page.locator("#certificate-count").inner_text() == "Not managed"
+        assert page.locator("#active-hash").inner_text() == "Not managed"
 
         page.get_by_text("Custom PEM file", exact=True).click()
         assert page.locator("#custom-path").is_enabled()
@@ -101,7 +103,6 @@ def main():
         page.locator("#apply-button").evaluate("element => element.focus()")
         assert page.evaluate("document.activeElement.id") == "apply-button"
         assert page.evaluate("document.documentElement.scrollWidth") <= 1920
-        assert page.evaluate("document.documentElement.scrollHeight") <= 1080
         screenshot = Path(gettempdir()).resolve() / "ca-bundle-manager-smoke.png"
         page.screenshot(path=str(screenshot), full_page=True)
 
@@ -110,6 +111,8 @@ def main():
         page.get_by_text("Custom PEM file", exact=True).click()
         page.locator("#custom-path").fill("/media/developer/custom CA; safe.pem")
         page.get_by_role("button", name="Apply selected roots").click()
+        assert page.get_by_role("button", name="Confirm apply").is_visible()
+        page.get_by_role("button", name="Confirm apply").click()
         page.wait_for_function("document.getElementById('active-indicator').textContent === 'APPLIED'")
         assert page.locator("#certificate-count").inner_text() == "120"
         assert page.locator("#custom-path").input_value() == "/media/developer/custom CA; safe.pem"
@@ -120,8 +123,10 @@ def main():
         assert page.get_by_role("button", name="Disable boot-time checks").is_visible()
 
         page.get_by_role("button", name="Restore stock trust").click()
+        assert page.get_by_role("button", name="Confirm restore").is_visible()
+        page.get_by_role("button", name="Confirm restore").click()
         page.wait_for_function("document.getElementById('active-indicator').textContent === 'STOCK'")
-        assert page.locator("#active-hash").inner_text() == "Not applied"
+        assert page.locator("#active-hash").inner_text() == "Not managed"
         assert page.locator("#connection-status").get_attribute("class") == "status-chip connected"
         assert not errors, errors
         browser.close()

@@ -80,18 +80,18 @@
       <section class="panel active-panel" aria-labelledby="active-title">
         <div class="panel-heading">
           <div>
-            <p class="eyebrow">02 / CURRENT SYSTEM TRUST</p>
-            <h2 id="active-title">Applied bundle</h2>
+            <p class="eyebrow">02 / TRUST STATUS</p>
+            <h2 id="active-title">Manager bundle</h2>
           </div>
           <span class="active-indicator" id="active-indicator">STOCK</span>
         </div>
 
         <div class="metric-row">
           <span class="metric-number" id="certificate-count">—</span>
-          <span class="metric-label">certificates<br>in active bundle</span>
+          <span class="metric-label">certificates<br>in manager bundle</span>
         </div>
         <div class="fingerprint-block">
-          <span class="eyebrow">SHA-256</span>
+          <span class="eyebrow">MANAGER BUNDLE SHA-256</span>
           <code id="active-hash">Not applied</code>
         </div>
 
@@ -101,9 +101,23 @@
         </div>
 
         <button class="button button-primary" id="apply-button" type="button">Apply selected roots</button>
+        <div class="confirm-panel" id="apply-confirmation" hidden>
+          <p><strong>Change system-wide trust?</strong> Selected roots will be trusted by apps using the system CA file.</p>
+          <div class="confirm-actions">
+            <button class="button button-quiet" id="apply-cancel-button" type="button">Cancel</button>
+            <button class="button button-primary" id="apply-confirm-button" type="button">Confirm apply</button>
+          </div>
+        </div>
         <button class="button button-secondary" id="boot-checks-button" type="button">Enable boot-time checks</button>
         <p class="boot-check-result" id="boot-check-result" role="status" aria-live="polite">Boot check has not run.</p>
         <button class="button button-quiet" id="restore-button" type="button">Restore stock trust</button>
+        <div class="confirm-panel" id="restore-confirmation" hidden>
+          <p><strong>Restore stock trust?</strong> This disables boot behavior and removes this manager's CA overlay.</p>
+          <div class="confirm-actions">
+            <button class="button button-quiet" id="restore-cancel-button" type="button">Cancel</button>
+            <button class="button button-primary" id="restore-confirm-button" type="button">Confirm restore</button>
+          </div>
+        </div>
         <p class="action-result" id="action-result" role="status" aria-live="polite">No changes made.</p>
       </section>
     </section>

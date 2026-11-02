@@ -10,6 +10,7 @@ const elements = Object.create(null);
 const calls = [];
 const uris = [];
 let foreignMount = "0";
+let confirmResult = true;
 
 function element(id) {
   if (!elements[id]) {
@@ -41,7 +42,7 @@ const context = {
   document,
   btoa: value => Buffer.from(value, "binary").toString("base64"),
   atob: value => Buffer.from(value, "base64").toString("binary"),
-  confirm: () => true,
+  confirm: () => confirmResult,
   webOS: {
     service: {
       request(uri, options) {
@@ -86,10 +87,19 @@ function loadUi(targetContext, targetDocument) {
 loadUi(context, document);
 
 assert.equal(element("source-mozilla").checked, true);
+assert.equal(element("certificate-count").textContent, "Not managed");
+assert.equal(element("active-hash").textContent, "Not managed");
 element("source-chrome").checked = true;
 element("source-custom").checked = true;
 element("custom-path").value = "/media/developer/TLS inspection; custom.pem";
 element("apply-button").trigger("click");
+assert.equal(element("apply-confirmation").hidden, false);
+assert.equal(calls.some(command => command.indexOf(" configure ") !== -1), false);
+element("apply-cancel-button").trigger("click");
+assert.equal(element("apply-confirmation").hidden, true);
+confirmResult = true;
+element("apply-button").trigger("click");
+element("apply-confirm-button").trigger("click");
 
 const configureCommand = calls.find(command => command.indexOf(" configure ") !== -1);
 assert.ok(configureCommand);
@@ -102,7 +112,15 @@ assert.ok(uris.includes("luna://org.webosbrew.hbchannel.service/"));
 
 element("boot-checks-button").trigger("click");
 assert.ok(calls.some(command => command.endsWith(" boot-checks on")));
+confirmResult = false;
 element("restore-button").trigger("click");
+assert.equal(element("restore-confirmation").hidden, false);
+assert.equal(calls.some(command => command.endsWith(" restore")), false);
+element("restore-cancel-button").trigger("click");
+assert.equal(element("restore-confirmation").hidden, true);
+confirmResult = true;
+element("restore-button").trigger("click");
+element("restore-confirm-button").trigger("click");
 assert.ok(calls.some(command => command.endsWith(" restore")));
 foreignMount = "1";
 element("boot-checks-button").trigger("click");

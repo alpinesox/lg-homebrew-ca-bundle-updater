@@ -102,8 +102,8 @@
     byId("source-custom").checked = !!state.custom_path_b64;
     byId("custom-path").disabled = !byId("source-custom").checked;
     byId("custom-risk").hidden = !byId("source-custom").checked;
-    byId("certificate-count").textContent = state.certificate_count || "—";
-    byId("active-hash").textContent = state.active_sha256 || "Not applied";
+    byId("certificate-count").textContent = state.mounted === "1" ? (state.certificate_count || "0") : "Not managed";
+    byId("active-hash").textContent = state.mounted === "1" && state.active_sha256 ? state.active_sha256 : "Not managed";
     var foreignMount = state.foreign_mount === "1";
     byId("active-indicator").textContent = foreignMount ? "OTHER OVERLAY" : (state.mounted === "1" ? "APPLIED" : "STOCK");
     byId("active-indicator").className = foreignMount ? "active-indicator conflict" : (state.mounted === "1" ? "active-indicator applied" : "active-indicator");
@@ -163,22 +163,38 @@
   }
 
   function applySelected() {
-    var config;
     if (busy) return;
     if (!rootStatus) {
       setMessage("Wait for Homebrew root access to be checked.", true);
       return;
     }
     try {
-      config = selectionPayload();
+      selectionPayload();
     } catch (error) {
       setMessage(error.message, true);
       return;
     }
-    if (!window.confirm("Apply these selected roots system-wide? This changes trust for applications using the TV's system CA file.")) return;
+    byId("apply-confirmation").hidden = false;
+    byId("apply-confirm-button").focus();
+  }
+
+  function confirmApply() {
+    var selection;
+    if (busy) return;
+    if (!rootStatus) {
+      setMessage("Wait for Homebrew root access to be checked.", true);
+      return;
+    }
+    try {
+      selection = selectionPayload();
+    } catch (error) {
+      setMessage(error.message, true);
+      return;
+    }
+    byId("apply-confirmation").hidden = true;
     setBusy(true);
-    setMessage("Validating sources and applying the bundle…", false);
-    serviceCall("configure", config, function (error, text) {
+    setMessage("Applying selected roots…", false);
+    serviceCall("configure", selection, function (error) {
       if (error) {
         setBusy(false);
         setMessage(error.message, true);
@@ -217,8 +233,15 @@
       setMessage("Wait for Homebrew root access to be checked.", true);
       return;
     }
-    if (!window.confirm("Restore the TV's stock CA bundle and disable boot-time checks? The original firmware file will not be changed.")) return;
+    byId("restore-confirmation").hidden = false;
+    byId("restore-confirm-button").focus();
+  }
+
+  function confirmRestore() {
+    if (busy || !rootStatus) return;
+    byId("restore-confirmation").hidden = true;
     setBusy(true);
+    setMessage("Restoring stock trust…", false);
     serviceCall("restore", "", function (error, text) {
       setBusy(false);
       setMessage(error ? error.message : (text.trim() || "Stock trust restored."), !!error);
@@ -233,8 +256,12 @@
       if (this.checked) byId("custom-path").focus();
     });
     byId("apply-button").addEventListener("click", applySelected);
+    byId("apply-confirm-button").addEventListener("click", confirmApply);
+    byId("apply-cancel-button").addEventListener("click", function () { byId("apply-confirmation").hidden = true; });
     byId("boot-checks-button").addEventListener("click", toggleBootChecks);
     byId("restore-button").addEventListener("click", restoreStock);
+    byId("restore-confirm-button").addEventListener("click", confirmRestore);
+    byId("restore-cancel-button").addEventListener("click", function () { byId("restore-confirmation").hidden = true; });
     setBusy(false);
     refresh();
   }
