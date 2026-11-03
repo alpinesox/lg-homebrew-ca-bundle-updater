@@ -33,6 +33,18 @@ jobs:
           done
           exit 1
       - run: npm run package
+      - name: Diagnose package timestamps
+        if: always()
+        run: |
+          echo "dist timestamps:"; stat -c '%y %n' dist dist/appinfo.json dist/index.html dist/scripts dist/scripts/ca-manager.sh
+          echo "IPK ar members:"; ar tv build/com.alpinesox.cabundlemanager.ipk || true
+          echo "inner tar members:"; ar p build/com.alpinesox.cabundlemanager.ipk data.tar.gz | tar -tzvf - | head -30 || true
+      - name: Diagnose package timestamps
+        if: always()
+        run: |
+          echo "dist timestamps:"; stat -c '%y %n' dist dist/appinfo.json dist/index.html dist/scripts dist/scripts/ca-manager.sh
+          echo "IPK ar members:"; ar tv build/com.alpinesox.cabundlemanager.ipk || true
+          echo "inner tar members:"; ar p build/com.alpinesox.cabundlemanager.ipk data.tar.gz | tar -tzvf - | head -30 || true
       - name: Check tag matches app version
         env:
           TAG: ${{ inputs.tag }}
