@@ -59,9 +59,13 @@ function stage() {
 }
 
 function ares(args) {
-  const packageCli = process.platform === "win32" ? "@webosose/ares-cli" : "@webos-tools/cli";
-  const command = path.join(ROOT, "node_modules", packageCli, "bin", "ares-package.js");
-  execFileSync(process.execPath, [command].concat(args), {
+  const command = process.platform === "win32"
+    ? process.execPath
+    : path.join(ROOT, "node_modules", ".bin", "ares-package");
+  const commandArgs = process.platform === "win32"
+    ? [path.join(ROOT, "node_modules", "@webos-tools", "cli", "bin", "ares-package.js")].concat(args)
+    : args;
+  execFileSync(command, commandArgs, {
     cwd: ROOT,
     stdio: "inherit"
   });
