@@ -1,0 +1,72 @@
+name: Rebuild and repair release IPK
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to rebuild after compatibility checks
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  rebuild-verify-publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm test
+      - run: npm run check:shell
+      - run: npm run test:providers
+      - run: npm run package
+      - name: Check tag matches app version
+        env:
+          TAG: ${{ inputs.tag }}
+        run: test "$TAG" = "v$(node -p 'require("./appinfo.json").version')"
+      - name: Verify IPK timestamps and script modes
+        run: |
+          python - <<'PY'
+          import io
+          import subprocess
+          import tarfile
+
+          ipk = "build/com.alpinesox.cabundlemanager.ipk"
+          data = subprocess.check_output(["ar", "p", ipk, "data.tar.gz"])
+          with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
+              members = archive.getmembers()
+              assert members, "IPK data archive is empty"
+              for member in members:
+                  assert member.mtime > 0, f"epoch timestamp: {member.name}"
+              modes = {member.name.lstrip("./"): member.mode for member in members}
+              for name in (
+                  "usr/palm/applications/com.alpinesox.cabundlemanager/scripts/ca-manager.sh",
+                  "usr/palm/applications/com.alpinesox.cabundlemanager/scripts/boot-hook.sh",
+              ):
+                  assert modes[name] & 0o111, f"not executable in IPK: {name}"
+          PY
+      - name: Verify Homebrew compatibility
+        uses: robinraju/release-downloader@v1.13
+        with:
+          repository: webosbrew/dev-toolbox-cli
+          latest: true
+          fileName: webosbrew-toolbox-*_amd64.deb
+          out-file-path: temp
+      - name: Install Homebrew verifier
+        run: sudo apt-get install -y ./temp/webosbrew-toolbox-*_amd64.deb
+      - name: Verify Homebrew compatibility
+        env:
+          TAG: ${{ inputs.tag }}
+        run: webosbrew-ipk-verify --format markdown --details build/com.alpinesox.cabundlemanager.ipk
+      - name: Replace release assets only after verification
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+        run: gh release upload "$TAG" build/com.alpinesox.cabundlemanager.ipk build/manifest.json --repo "$GITHUB_REPOSITORY" --clobber

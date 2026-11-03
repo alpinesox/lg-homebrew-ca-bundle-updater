@@ -28,6 +28,7 @@ function stage() {
   fs.mkdirSync(path.join(DIST, "assets"), { recursive: true });
   fs.mkdirSync(BUILD, { recursive: true });
   fs.copyFileSync(path.join(ROOT, "appinfo.json"), path.join(DIST, "appinfo.json"));
+  fs.copyFileSync(path.join(ROOT, "package.properties"), path.join(DIST, "package.properties"));
   fs.copyFileSync(path.join(ROOT, "index.html"), path.join(DIST, "index.html"));
   fs.cpSync(path.join(ROOT, "src"), path.join(DIST, "src"), { recursive: true });
   fs.cpSync(path.join(ROOT, "scripts"), path.join(DIST, "scripts"), { recursive: true });
@@ -45,10 +46,21 @@ function stage() {
   fs.writeFileSync(path.join(DIST, "assets", "icon.png"), icon);
   fs.chmodSync(path.join(DIST, "scripts", "ca-manager.sh"), 0o755);
   fs.chmodSync(path.join(DIST, "scripts", "boot-hook.sh"), 0o755);
+  const buildTime = new Date();
+  function touchTree(directory) {
+    for (const name of fs.readdirSync(directory)) {
+      const pathname = path.join(directory, name);
+      if (fs.statSync(pathname).isDirectory()) touchTree(pathname);
+      fs.utimesSync(pathname, buildTime, buildTime);
+    }
+    fs.utimesSync(directory, buildTime, buildTime);
+  }
+  touchTree(DIST);
 }
 
 function ares(args) {
-  const command = path.join(ROOT, "node_modules", "@webosose", "ares-cli", "bin", "ares-package.js");
+  const packageCli = process.platform === "win32" ? "@webosose/ares-cli" : "@webos-tools/cli";
+  const command = path.join(ROOT, "node_modules", packageCli, "bin", "ares-package.js");
   execFileSync(process.execPath, [command].concat(args), {
     cwd: ROOT,
     stdio: "inherit"
@@ -66,12 +78,12 @@ function writeManifest() {
 function packageApp() {
   stage();
   ares(["-c", DIST]);
-  ares([DIST, "--outdir", BUILD]);
+  ares([DIST, "--outdir", BUILD, "--app-exclude", "icon128.png.b64"]);
   const packaged = fs.readdirSync(BUILD).filter(name => name.endsWith(".ipk"));
   if (packaged.length !== 1) throw new Error(`Expected one IPK, found ${packaged.length}`);
   const source = path.join(BUILD, packaged[0]);
   if (source !== IPK) fs.renameSync(source, IPK);
-  ares(["-i", IPK]);
+  ares(["--info-detail", IPK]);
   writeManifest();
   console.log(`Built ${path.relative(ROOT, IPK)} and manifest.json`);
 }

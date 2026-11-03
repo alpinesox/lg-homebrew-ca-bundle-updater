@@ -14,6 +14,7 @@
     "test:providers": "bash tests/provider-source-smoke.sh"
   },
   "devDependencies": {
-    "@webosose/ares-cli": "2.4.0"
+    "@webosose/ares-cli": "2.4.0",
+    "@webos-tools/cli": "3.2.6"
   }
 }
