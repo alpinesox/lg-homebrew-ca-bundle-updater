@@ -1,6 +1,6 @@
 {
   "name": "lg-homebrew-ca-bundle-updater",
-  "version": "0.1.4",
+  "version": "0.1.6",
   "private": true,
   "description": "webOS Homebrew app for selecting and applying CA trust bundles",
   "engines": {

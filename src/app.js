@@ -121,6 +121,56 @@
     byId("boot-check-result").textContent = config.bootCheckMessage(state);
   }
 
+  function handleRemoteArrow(event) {
+    var active = document.activeElement;
+    var panel = active && active.closest(".panel");
+    var key = event.key;
+    var direction;
+    var searchRoot;
+    var candidates;
+    var sourceRect;
+    var sourceX;
+    var sourceY;
+    var best = null;
+    var bestScore = Infinity;
+    var i;
+    var candidate;
+    var rect;
+    var dx;
+    var dy;
+    var primary;
+    var secondary;
+    var score;
+    if (!panel || active.matches("input[type=text], textarea, select, [contenteditable=true]")) return;
+    if (key !== "ArrowUp" && key !== "ArrowDown" && key !== "ArrowLeft" && key !== "ArrowRight") return;
+    direction = key.slice(5).toLowerCase();
+    searchRoot = direction === "left" || direction === "right" ? byId("layout") : panel;
+    sourceRect = active.getBoundingClientRect();
+    sourceX = sourceRect.left + sourceRect.width / 2;
+    sourceY = sourceRect.top + sourceRect.height / 2;
+    candidates = searchRoot.querySelectorAll("button, input, [tabindex]");
+    for (i = 0; i < candidates.length; i += 1) {
+      candidate = candidates[i];
+      if (candidate === active || candidate.matches(":disabled") || candidate.tabIndex < 0 || candidate.closest("[hidden], [inert]")) continue;
+      rect = candidate.getBoundingClientRect();
+      if (!rect.width || !rect.height || window.getComputedStyle(candidate).visibility === "hidden") continue;
+      dx = rect.left + rect.width / 2 - sourceX;
+      dy = rect.top + rect.height / 2 - sourceY;
+      primary = direction === "up" ? -dy : (direction === "down" ? dy : (direction === "left" ? -dx : dx));
+      if (primary <= 0) continue;
+      secondary = direction === "up" || direction === "down" ? Math.abs(dx) : Math.abs(dy);
+      score = primary + secondary * 1.5;
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+    if (best) {
+      event.preventDefault();
+      best.focus();
+    }
+  }
+
   function refresh() {
     serviceCall("bootstrap", "", function (bootstrapError, bootstrapOutput) {
       if (bootstrapError) {
@@ -250,6 +300,7 @@
   }
 
   function init() {
+    document.addEventListener("keydown", handleRemoteArrow);
     byId("source-custom").addEventListener("change", function () {
       byId("custom-path").disabled = !this.checked;
       byId("custom-risk").hidden = !this.checked;

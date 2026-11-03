@@ -7,7 +7,7 @@ const { createManifest } = require("../tools/manifest");
 const app = {
   id: "com.alpinesox.cabundlemanager",
   title: "CA Bundle Manager",
-  version: "0.1.4",
+  version: "0.1.6",
   type: "web",
   appDescription: "Select and apply CA roots on an LG webOS TV."
 };
@@ -19,7 +19,7 @@ assert.equal(manifest.version, app.version);
 assert.equal("rootRequired" in manifest, false);
 assert.equal(manifest.ipkHash.sha256, crypto.createHash("sha256").update(ipk).digest("hex"));
 assert.equal(manifest.ipkSize, ipk.length);
-assert.match(manifest.ipkUrl, /releases\/download\/v0\.1\.4\/com\.alpinesox\.cabundlemanager\.ipk$/);
+assert.match(manifest.ipkUrl, /releases\/download\/v0\.1\.6\/com\.alpinesox\.cabundlemanager\.ipk$/);
 assert.match(manifest.iconUri, /^https:\/\//);
 assert.throws(() => createManifest(app, Buffer.alloc(0)), /empty/);
 assert.throws(() => createManifest({ ...app, id: "bad id" }, ipk), /id/);

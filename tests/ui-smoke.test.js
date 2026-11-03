@@ -32,7 +32,10 @@ function element(id) {
 }
 
 const document = {
+  activeElement: null,
   addEventListener(name, handler) {
+    this.handlers = this.handlers || Object.create(null);
+    this.handlers[name] = handler;
     if (name === "DOMContentLoaded") this.ready = handler;
   },
   getElementById: element

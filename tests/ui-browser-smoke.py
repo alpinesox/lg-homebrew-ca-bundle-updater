@@ -94,6 +94,14 @@ def main():
         assert page.locator("#custom-path").is_disabled()
         assert page.locator("#certificate-count").inner_text() == "Not managed"
         assert page.locator("#active-hash").inner_text() == "Not managed"
+        page.locator("#source-mozilla").focus()
+        page.keyboard.press("ArrowDown")
+        assert page.evaluate("document.activeElement.id") == "source-chrome"
+        page.locator("#source-mozilla").focus()
+        page.keyboard.press("ArrowRight")
+        assert page.evaluate("document.activeElement.id") == "apply-button"
+        page.keyboard.press("ArrowLeft")
+        assert page.evaluate("document.activeElement.closest('.sources-panel') !== null")
 
         page.get_by_text("Custom PEM file", exact=True).click()
         assert page.locator("#custom-path").is_enabled()
