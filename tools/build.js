@@ -86,17 +86,23 @@ function normalizeLinuxIpkTimestamps() {
   try {
     execFileSync("ar", ["x", IPK], { cwd: tempDir });
     execFileSync("python3", ["-c", [
-      "import pathlib, sys, tarfile, time",
-      "root, output = pathlib.Path(sys.argv[1]), sys.argv[2]",
-      "now = int(time.time())",
-      "with tarfile.open(output, 'w:gz', format=tarfile.USTAR_FORMAT) as archive:",
-      "  for path in sorted(root.rglob('*')):",
-      "      info = archive.gettarinfo(str(path), arcname=path.relative_to(root).as_posix())",
-      "      info.mtime = now",
-      "      if info.isfile():",
-      "        with path.open('rb') as stream: archive.addfile(info, stream)",
-      "      else: archive.addfile(info)",
-    ].join("\n"), DIST, path.join(tempDir, "data.tar.gz")]);
+      "import gzip, pathlib, sys, tarfile, time",
+      "source, output = sys.argv[1], sys.argv[2]",
+      "raw = gzip.decompress(pathlib.Path(source).read_bytes())",
+      "stream = __import__('io').BytesIO(raw)",
+      "blocks = []",
+      "while True:",
+      "  header = stream.read(512)",
+      "  if len(header) < 512 or header == bytes(512): break",
+      "  size = int(header[124:136].rstrip(b'\\0 ') or b'0', 8)",
+      "  body = stream.read(((size + 511) // 512) * 512)",
+      "  header = bytearray(header)",
+      "  field = ('%011o\\0' % int(time.time())).encode()",
+      "  header[136:148] = field",
+      "  blocks.append(bytes(header) + body)",
+      "pathlib.Path(output).write_bytes(gzip.compress(b''.join(blocks) + bytes(1024), mtime=int(time.time())))",
+    ].join("\n"), path.join(tempDir, "data.tar.gz"), path.join(tempDir, "data-normalized.tar.gz")]);
+    fs.renameSync(path.join(tempDir, "data-normalized.tar.gz"), path.join(tempDir, "data.tar.gz"));
     execFileSync("ar", ["rcs", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
     fs.renameSync(rebuilt, IPK);
     verifyLinuxIpk();
