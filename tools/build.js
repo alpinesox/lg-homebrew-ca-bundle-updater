@@ -75,15 +75,66 @@ function writeManifest() {
   fs.writeFileSync(path.join(BUILD, "manifest.json"), json);
 }
 
+function normalizeLinuxIpkTimestamps() {
+  if (process.platform === "win32") return;
+  const tempDir = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "ca-bundle-ipk-"));
+  const dataDir = path.join(tempDir, "data");
+  const rebuilt = path.join(tempDir, "rebuilt.ipk");
+  try {
+    execFileSync("ar", ["x", IPK], { cwd: tempDir });
+    fs.mkdirSync(dataDir);
+    execFileSync("tar", ["-xzf", "data.tar.gz", "-C", dataDir], { cwd: tempDir });
+    const now = new Date();
+    function touchTree(directory) {
+      for (const name of fs.readdirSync(directory)) {
+        const pathname = path.join(directory, name);
+        if (fs.statSync(pathname).isDirectory()) touchTree(pathname);
+        fs.utimesSync(pathname, now, now);
+      }
+      fs.utimesSync(directory, now, now);
+    }
+    touchTree(dataDir);
+    const normalizedDataTar = path.join(tempDir, "data-normalized.tar.gz");
+    execFileSync("tar", ["--format=ustar", "-czf", normalizedDataTar, "-C", dataDir, "."]);
+    fs.renameSync(normalizedDataTar, path.join(tempDir, "data.tar.gz"));
+    execFileSync("ar", ["q", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
+    fs.renameSync(rebuilt, IPK);
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
+function verifyLinuxIpk() {
+  if (process.platform === "win32") return;
+  const tempDir = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "ca-bundle-verify-"));
+  try {
+    execFileSync("ar", ["x", IPK], { cwd: tempDir });
+    const data = execFileSync("tar", ["-tvzf", "data.tar.gz"], { cwd: tempDir, encoding: "utf8" });
+    if (/Dec 31\s+1969/.test(data)) throw new Error("IPK contains epoch-dated files");
+    for (const filename of ["ca-manager.sh", "boot-hook.sh"]) {
+      if (!new RegExp(`^-rwx[^\\n]*\\/${filename}$`, "m").test(data)) {
+        throw new Error(`IPK helper is not executable: ${filename}`);
+      }
+    }
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true });
+  }
+}
+
 function packageApp() {
   stage();
   ares(["-c", DIST]);
+  const buildTime = new Date();
+  for (const entry of fs.readdirSync(DIST, { recursive: true, withFileTypes: true })) {
+    fs.utimesSync(path.join(entry.parentPath, entry.name), buildTime, buildTime);
+  }
   ares([DIST, "--outdir", BUILD, "--app-exclude", "icon128.png.b64"]);
   const packaged = fs.readdirSync(BUILD).filter(name => name.endsWith(".ipk"));
   if (packaged.length !== 1) throw new Error(`Expected one IPK, found ${packaged.length}`);
   const source = path.join(BUILD, packaged[0]);
   if (source !== IPK) fs.renameSync(source, IPK);
-  ares(["--info-detail", IPK]);
+  normalizeLinuxIpkTimestamps();
+  verifyLinuxIpk();
   writeManifest();
   console.log(`Built ${path.relative(ROOT, IPK)} and manifest.json`);
 }
