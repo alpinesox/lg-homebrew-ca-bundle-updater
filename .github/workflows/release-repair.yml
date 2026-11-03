@@ -50,6 +50,8 @@ jobs:
               members = archive.getmembers()
               assert members, "IPK data archive is empty"
               for member in members:
+                  print(f"{member.name!r}: mtime={member.mtime} mode={member.mode:o}")
+              for member in members:
                   assert member.mtime > 0, f"epoch timestamp: {member.name}"
               modes = {member.name.lstrip("./"): member.mode for member in members}
               for name in (
