@@ -82,29 +82,21 @@ function writeManifest() {
 function normalizeLinuxIpkTimestamps() {
   if (process.platform === "win32") return;
   const tempDir = fs.mkdtempSync(path.join(require("node:os").tmpdir(), "ca-bundle-ipk-"));
-  const dataDir = path.join(tempDir, "data");
   const rebuilt = path.join(tempDir, "rebuilt.ipk");
   try {
     execFileSync("ar", ["x", IPK], { cwd: tempDir });
-    fs.mkdirSync(dataDir);
-    execFileSync("tar", ["-xzf", "data.tar.gz", "-C", dataDir], { cwd: tempDir });
-    const normalizedDataTar = path.join(tempDir, "data-normalized.tar.gz");
     execFileSync("python3", ["-c", [
-      "import os, sys, tarfile, time",
-      "root, output = sys.argv[1], sys.argv[2]",
+      "import pathlib, sys, tarfile, time",
+      "root, output = pathlib.Path(sys.argv[1]), sys.argv[2]",
       "now = int(time.time())",
       "with tarfile.open(output, 'w:gz', format=tarfile.USTAR_FORMAT) as archive:",
-      "  for base, dirs, files in os.walk(root):",
-      "    for name in sorted(dirs + files):",
-      "      path = os.path.join(base, name)",
-      "      arcname = os.path.relpath(path, root)",
-      "      info = archive.gettarinfo(path, arcname=arcname)",
+      "  for path in sorted(root.rglob('*')):",
+      "      info = archive.gettarinfo(str(path), arcname=path.relative_to(root).as_posix())",
       "      info.mtime = now",
       "      if info.isfile():",
-      "        with open(path, 'rb') as stream: archive.addfile(info, stream)",
+      "        with path.open('rb') as stream: archive.addfile(info, stream)",
       "      else: archive.addfile(info)",
-    ].join("\n"), dataDir, normalizedDataTar]);
-    fs.renameSync(normalizedDataTar, path.join(tempDir, "data.tar.gz"));
+    ].join("\n"), DIST, path.join(tempDir, "data.tar.gz")]);
     execFileSync("ar", ["rcs", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
     fs.renameSync(rebuilt, IPK);
     verifyLinuxIpk();
