@@ -88,6 +88,7 @@ function normalizeLinuxIpkTimestamps() {
     execFileSync("ar", ["x", IPK], { cwd: tempDir });
     fs.mkdirSync(dataDir);
     execFileSync("tar", ["-xzf", "data.tar.gz", "-C", dataDir], { cwd: tempDir });
+    execFileSync("tar", ["-tvzf", "data.tar.gz"], { cwd: tempDir, stdio: "inherit" });
     execFileSync("python3", ["-c", [
       "import os, sys, tarfile, time",
       "root, output = sys.argv[1], sys.argv[2]",
@@ -103,6 +104,7 @@ function normalizeLinuxIpkTimestamps() {
       "        with open(path, 'rb') as stream: archive.addfile(info, stream)",
       "      else: archive.addfile(info)",
     ].join("\n"), dataDir, path.join(tempDir, "data.tar.gz")]);
+    execFileSync("tar", ["-tvzf", "data.tar.gz"], { cwd: tempDir, stdio: "inherit" });
     const inspected = execFileSync("tar", ["-tzf", "data.tar.gz"], { cwd: tempDir, encoding: "utf8" }).trim().split(/\r?\n/);
     if (inspected.some(name => name === "usr" || name === "usr/")) throw new Error("Unexpected tar root member");
     execFileSync("ar", ["rcs", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
