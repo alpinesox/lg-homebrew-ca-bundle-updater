@@ -25,7 +25,13 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run check:shell
-      - run: npm run test:providers
+      - name: Check provider sources with transient-network retries
+        run: |
+          for attempt in 1 2 3; do
+            npm run test:providers && exit 0
+            if [ "$attempt" -lt 3 ]; then sleep 15; fi
+          done
+          exit 1
       - run: npm run package
       - name: Check tag matches app version
         env:
