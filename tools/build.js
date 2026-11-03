@@ -97,8 +97,9 @@ function normalizeLinuxIpkTimestamps() {
     const normalizedDataTar = path.join(tempDir, "data-normalized.tar.gz");
     execFileSync("tar", ["--format=ustar", "-czf", normalizedDataTar, "-C", dataDir, ...fs.readdirSync(dataDir)]);
     fs.renameSync(normalizedDataTar, path.join(tempDir, "data.tar.gz"));
-    execFileSync("ar", ["q", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
+    execFileSync("ar", ["rcs", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
     fs.renameSync(rebuilt, IPK);
+    verifyLinuxIpk();
   } finally {
     fs.rmSync(tempDir, { recursive: true, force: true });
   }
