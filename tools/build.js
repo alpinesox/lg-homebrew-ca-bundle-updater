@@ -84,19 +84,23 @@ function normalizeLinuxIpkTimestamps() {
     execFileSync("ar", ["x", IPK], { cwd: tempDir });
     fs.mkdirSync(dataDir);
     execFileSync("tar", ["-xzf", "data.tar.gz", "-C", dataDir], { cwd: tempDir });
-    const now = new Date();
-    function touchTree(directory) {
-      for (const name of fs.readdirSync(directory)) {
-        const pathname = path.join(directory, name);
-        if (fs.statSync(pathname).isDirectory()) touchTree(pathname);
-        fs.utimesSync(pathname, now, now);
-      }
-      fs.utimesSync(directory, now, now);
-    }
-    touchTree(dataDir);
-    const normalizedDataTar = path.join(tempDir, "data-normalized.tar.gz");
-    execFileSync("tar", ["--format=ustar", "-czf", normalizedDataTar, "-C", dataDir, ...fs.readdirSync(dataDir)]);
-    fs.renameSync(normalizedDataTar, path.join(tempDir, "data.tar.gz"));
+    execFileSync("python3", ["-c", [
+      "import os, sys, tarfile, time",
+      "root, output = sys.argv[1], sys.argv[2]",
+      "now = int(time.time())",
+      "with tarfile.open(output, 'w:gz', format=tarfile.USTAR_FORMAT) as archive:",
+      "  for base, dirs, files in os.walk(root):",
+      "    for name in sorted(dirs + files):",
+      "      path = os.path.join(base, name)",
+      "      arcname = os.path.relpath(path, root)",
+      "      info = archive.gettarinfo(path, arcname=arcname)",
+      "      info.mtime = now",
+      "      if info.isfile():",
+      "        with open(path, 'rb') as stream: archive.addfile(info, stream)",
+      "      else: archive.addfile(info)",
+    ].join("\n"), dataDir, path.join(tempDir, "data.tar.gz")]);
+    const inspected = execFileSync("tar", ["-tzf", "data.tar.gz"], { cwd: tempDir, encoding: "utf8" }).trim().split(/\r?\n/);
+    if (inspected.some(name => name === "usr" || name === "usr/")) throw new Error("Unexpected tar root member");
     execFileSync("ar", ["rcs", rebuilt, "debian-binary", "control.tar.gz", "data.tar.gz"], { cwd: tempDir });
     fs.renameSync(rebuilt, IPK);
     verifyLinuxIpk();
