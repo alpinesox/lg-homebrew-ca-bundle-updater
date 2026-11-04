@@ -23,6 +23,11 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm test
       - run: npm run check:shell
+      - name: Inspect checkout metadata settings
+        run: |
+          git config --show-origin --get core.filemode || true
+          git status --short
+          stat -c '%a %y %n' tools/build.js scripts/ca-manager.sh scripts/boot-hook.sh
       - name: Check provider sources with transient-network retries
         run: |
           for attempt in 1 2 3; do
